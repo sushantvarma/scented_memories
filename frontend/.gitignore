@@ -1,0 +1,19 @@
+# Next.js build output
+.next/
+out/
+
+# Dependencies
+node_modules/
+
+# Secrets
+.env.local
+.env.production
+.env.*.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vercel
+.vercel

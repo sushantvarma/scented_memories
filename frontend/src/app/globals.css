@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap');
+
+@layer base {
+  :root {
+    --color-cream: #FAF7F2;
+    --color-warm-white: #FFFDF9;
+    --color-sand: #E8DDD0;
+    --color-taupe: #C4B5A5;
+    --color-brown: #8B6F5E;
+    --color-espresso: #3D2B1F;
+    --color-gold: #C9A96E;
+    --color-gold-light: #E8D5B0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#FAF7F2] text-[#3D2B1F] antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: 'Cormorant Garamond', serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#3D2B1F] text-[#FAF7F2] text-sm font-medium tracking-widest uppercase transition-all duration-300 hover:bg-[#8B6F5E] disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 px-8 py-3.5 border border-[#3D2B1F] text-[#3D2B1F] text-sm font-medium tracking-widest uppercase transition-all duration-300 hover:bg-[#3D2B1F] hover:text-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-[#8B6F5E] text-sm font-medium tracking-wide transition-colors duration-200 hover:text-[#3D2B1F];
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-white border border-[#E8DDD0] text-[#3D2B1F] text-sm placeholder-[#C4B5A5] focus:outline-none focus:border-[#8B6F5E] transition-colors duration-200;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:border-red-500;
+  }
+
+  .section-title {
+    @apply font-['Cormorant_Garamond'] text-3xl md:text-4xl font-light text-[#3D2B1F] tracking-wide;
+  }
+
+  .tag-pill {
+    @apply inline-block px-3 py-1 text-xs tracking-wider uppercase bg-[#E8DDD0] text-[#8B6F5E] font-medium;
+  }
+
+  .divider {
+    @apply w-12 h-px bg-[#C9A96E] mx-auto my-4;
+  }
+}

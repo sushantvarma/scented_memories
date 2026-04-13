@@ -1,0 +1,19 @@
+# Maven build output
+target/
+*.class
+*.jar
+*.war
+
+# Maven wrapper download cache
+.mvn/wrapper/maven-wrapper.jar
+
+# Spring Boot dev properties (contains DB credentials)
+src/main/resources/application-dev.properties
+src/main/resources/application-prod.properties
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/

@@ -1,0 +1,13 @@
+# Copy this file to application-dev.properties and fill in your values
+spring.datasource.url=jdbc:postgresql://<host>/<db>?sslmode=require
+spring.datasource.username=<username>
+spring.datasource.password=<password>
+
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+
+app.jwt.secret=<at-least-32-character-random-secret>
+app.cors.allowed-origins=http://localhost:3000
