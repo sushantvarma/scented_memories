@@ -1,0 +1,16 @@
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.iml
+
+# ── Secrets — NEVER commit these ─────────────────────────────────────────────
+*.env
+*.env.local
+*.env.production
+*.env.*.local
+application-dev.properties
+application-prod.properties
