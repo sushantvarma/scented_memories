@@ -1,0 +1,24 @@
+{
+  "enabled": true,
+  "name": "Auto Commit & Push on Save",
+  "description": "Automatically stages, commits, and pushes any changed files to GitHub whenever a source file is saved.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.java",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.sql",
+      "**/*.properties",
+      "**/*.md",
+      "**/*.json",
+      "**/*.css"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd /Users/sushant/Code && git add -A && git diff --cached --quiet || git commit -m \"chore: auto-save $(date '+%Y-%m-%d %H:%M')\" && git push origin main",
+    "timeout": 30
+  }
+}
