@@ -9,7 +9,28 @@
 
 import type { ApiError } from "@/types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// NEXT_PUBLIC_API_URL must be set in every environment:
+//   - Local dev:  frontend/.env.local  → http://localhost:8080
+//   - Vercel:     Environment variable → https://<your-render-service>.onrender.com
+//
+// In production (server-side), throw immediately if the variable is missing so
+// the build fails loudly rather than silently calling localhost.
+const BASE_URL = (() => {
+  const url = process.env.NEXT_PUBLIC_API_URL;
+  if (!url) {
+    // During SSR / build on Vercel, window is undefined — throw to surface the
+    // misconfiguration early. In the browser, fall back to localhost so local
+    // development without .env.local still works.
+    if (typeof window === "undefined") {
+      throw new Error(
+        "NEXT_PUBLIC_API_URL is not set. " +
+        "Add it to .env.local for local dev or set it as an environment variable on Vercel."
+      );
+    }
+    return "http://localhost:8080";
+  }
+  return url;
+})();
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 2000; // 2s → 4s → 8s

@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: scented-memories-backend
+    runtime: java
+    region: singapore        # closest to Neon ap-southeast-1; change if needed
+    plan: free
+
+    # ── Source ──────────────────────────────────────────────────────────────
+    # Render builds from the backend/ subdirectory so Maven wrapper and
+    # pom.xml are resolved correctly.
+    rootDir: backend
+
+    # ── Build ────────────────────────────────────────────────────────────────
+    # -DskipTests: skip unit tests during CI build (tests require a live DB).
+    # -Pprod: activates the Maven 'prod' profile if defined; harmless if not.
+    buildCommand: ./mvnw clean package -DskipTests -q
+
+    # ── Start ────────────────────────────────────────────────────────────────
+    # Render injects $PORT at runtime. The app reads it via ${PORT:8080}.
+    #
+    # JVM flags:
+    #   -Xmx256m                  — cap heap for Render free tier (512 MB RAM total)
+    #   -XX:+UseContainerSupport  — respect cgroup memory limits inside the container
+    #   -Dspring.profiles.active=prod — activates application-prod.properties if present;
+    #                                   falls back to application.properties only (fine for MVP)
+    #   -Djava.security.egd=...   — faster SecureRandom init (avoids /dev/random blocking)
+    startCommand: >-
+      java
+      -Xmx256m
+      -XX:+UseContainerSupport
+      -Dspring.profiles.active=prod
+      -Djava.security.egd=file:/dev/./urandom
+      -jar target/scented-memories-backend-0.0.1-SNAPSHOT.jar
+
+    # ── Health check ─────────────────────────────────────────────────────────
+    # Render pings this path after every deploy to confirm the service is up.
+    # /health returns HTTP 200 "UP" with no DB call — responds even during
+    # a brief DB hiccup and never blocks a deploy unnecessarily.
+    healthCheckPath: /health
+
+    # ── Environment variables ─────────────────────────────────────────────────
+    # sync: false  → value must be set manually in the Render dashboard.
+    #               It will NOT be committed to this file (no secrets in git).
+    envVars:
+      # Required — Neon JDBC URL (pooler endpoint, with SSL params)
+      # Format: jdbc:postgresql://<pooler-host>/<dbname>?sslmode=require&channel_binding=require
+      - key: DATABASE_URL
+        sync: false
+
+      # Required — JWT signing secret, minimum 32 random characters
+      # Generate: openssl rand -base64 48
+      - key: JWT_SECRET
+        sync: false
+
+      # Required after Vercel deploy — exact Vercel URL, e.g. https://scented-memories.vercel.app
+      # Leave unset on first deploy (defaults to * in application.properties).
+      # Set it before going live to lock down CORS.
+      - key: FRONTEND_URL
+        sync: false
+
+      # Optional — override log level without redeploying
+      # Useful for temporary debug sessions. Remove or set to INFO when done.
+      # - key: LOGGING_LEVEL_COM_SCENTEDMEMORIES
+      #   value: DEBUG
+
+      # Note: PORT is injected automatically by Render. Do NOT set it manually.
+      # Note: DB_USERNAME / DB_PASSWORD are not needed when credentials are
+      #       embedded in DATABASE_URL (standard Neon pooler URL format).

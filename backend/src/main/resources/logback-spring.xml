@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Production logging configuration for ScentedMemories backend.
+  Render captures stdout/stderr from the process — plain-text console output
+  is the correct strategy (no file appenders needed on Render free tier).
+
+  Log levels:
+    - Root: INFO  — captures Spring startup, Flyway migrations, HikariCP events
+    - com.scentedmemories: INFO (raise to DEBUG locally via application-dev.properties)
+    - org.hibernate.SQL: OFF — show-sql=false enforced here as well
+    - org.springframework.security: WARN — reduces auth filter noise in prod logs
+-->
+<configuration>
+
+    <!-- ── Console appender (stdout → Render log stream) ─────────────────── -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+              Pattern includes:
+                %d{ISO8601}       — timestamp
+                %-5level          — log level, left-padded to 5 chars
+                [%thread]         — thread name (useful for async debugging)
+                %logger{36}       — logger name, truncated to 36 chars
+                - %msg%n          — message + newline
+            -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ── Application logger ─────────────────────────────────────────────── -->
+    <logger name="com.scentedmemories" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!-- ── Suppress noisy framework loggers in production ────────────────── -->
+    <logger name="org.hibernate.SQL"                          level="OFF"/>
+    <logger name="org.hibernate.type.descriptor.sql"         level="OFF"/>
+    <logger name="org.springframework.security"              level="WARN"/>
+    <logger name="org.springframework.web"                   level="WARN"/>
+    <logger name="com.zaxxer.hikari"                         level="INFO"/>
+    <logger name="org.flywaydb"                              level="INFO"/>
+
+    <!-- ── Root logger ───────────────────────────────────────────────────── -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
