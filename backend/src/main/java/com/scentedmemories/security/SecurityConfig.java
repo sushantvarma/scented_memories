@@ -65,7 +65,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(allowedOrigin));
+
+        boolean isWildcard = "*".equals(allowedOrigin);
+        if (isWildcard) {
+            // Wildcard origin is incompatible with allowCredentials(true) per the CORS spec.
+            // Use allowedOriginPatterns("*") instead, which allows all origins while still
+            // permitting credentials headers to be forwarded.
+            config.setAllowedOriginPatterns(List.of("*"));
+        } else {
+            config.setAllowedOrigins(List.of(allowedOrigin));
+        }
+
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
