@@ -5,6 +5,8 @@ import { productsApi } from "@/lib/api/products";
 import { ApiClientError } from "@/lib/apiClient";
 import AddToCartButton from "@/components/AddToCartButton";
 
+export const dynamic = "force-dynamic";
+
 interface Props { params: { slug: string } }
 
 export default async function ProductDetailPage({ params }: Props) {

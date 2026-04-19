@@ -4,6 +4,8 @@ import FilterSidebar from "@/components/FilterSidebar";
 import ProductCard from "@/components/ProductCard";
 import Pagination from "@/components/Pagination";
 
+export const dynamic = "force-dynamic";
+
 interface SearchParams {
   categoryId?: string;
   tagIds?: string | string[];

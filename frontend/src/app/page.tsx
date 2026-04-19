@@ -3,6 +3,11 @@ import { productsApi } from "@/lib/api/products";
 import type { Category, ProductSummary } from "@/types";
 import ProductCard from "@/components/ProductCard";
 
+// Force dynamic rendering — this page fetches live data from the backend.
+// Without this, Next.js tries to statically prerender at build time, which
+// fails when the Render backend is cold or not yet deployed.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [productsPage, categories] = await Promise.all([
     productsApi.list({ size: 8, sortBy: "createdAt", sortDir: "desc" }),
