@@ -14,7 +14,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Navbar />
         <main className="pt-16">{children}</main>
         <footer className="mt-24 border-t border-sand py-12 text-center">
-          <p className="font-serif text-2xl text-espresso tracking-wide mb-2">ScentedMemories</p>
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <img
+              src="/logo.jpeg"
+              alt="Scented Memories"
+              className="h-12 w-12 rounded-full object-cover border border-sand"
+            />
+            <p className="font-serif text-2xl text-espresso tracking-wide">ScentedMemories</p>
+          </div>
           <p className="text-sm text-taupe tracking-widest uppercase">
             Premium Home Fragrance &amp; Wellness
           </p>

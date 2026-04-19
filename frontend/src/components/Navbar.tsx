@@ -32,9 +32,17 @@ export default function Navbar() {
         {/* Logo */}
         <Link
           href="/"
-          className="font-serif text-lg sm:text-xl text-espresso tracking-widest hover:text-brown transition-colors"
+          className="flex items-center hover:opacity-80 transition-opacity"
+          aria-label="ScentedMemories — Home"
         >
-          ScentedMemories
+          <img
+            src="/logo.jpeg"
+            alt="Scented Memories"
+            className="h-10 w-10 sm:h-11 sm:w-11 rounded-full object-cover border border-sand"
+          />
+          <span className="ml-2.5 font-serif text-base sm:text-lg text-espresso tracking-wide hidden sm:inline leading-tight">
+            Scented<br className="hidden" />Memories
+          </span>
         </Link>
 
         {/* Desktop nav */}
