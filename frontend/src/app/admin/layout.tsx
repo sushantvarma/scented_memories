@@ -43,7 +43,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const { user, isAdmin, clearAuth, initFromStorage } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   useEffect(() => { initFromStorage(); }, [initFromStorage]);
 
   useEffect(() => {
@@ -71,8 +70,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-[#F5F3F0] flex">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-60 bg-espresso flex-shrink-0 flex flex-col min-h-screen">
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-60 bg-espresso flex-shrink-0 flex flex-col min-h-screen
+        transform transition-transform duration-200
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+      `}>
         {/* Logo */}
         <div className="px-6 py-6 border-b border-white/10">
           <p className="font-serif text-lg text-cream tracking-widest">ScentedMemories</p>
@@ -144,10 +156,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-0">
         {/* Top bar */}
-        <header className="bg-white border-b border-sand px-8 py-4 flex items-center justify-between">
-          <div>
+        <header className="bg-white border-b border-sand px-4 sm:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <button
+              className="lg:hidden p-1 text-espresso"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-label="Open menu"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             {NAV_ITEMS.find((n) => n.href === pathname) && (
               <h1 className="font-serif text-xl text-espresso">
                 {NAV_ITEMS.find((n) => n.href === pathname)?.label}
@@ -156,11 +178,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
           <div className="flex items-center gap-2 text-xs text-taupe">
             <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span>Connected to Neon DB</span>
+            <span className="hidden sm:inline">Connected to Neon DB</span>
           </div>
         </header>
 
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 sm:p-8 overflow-auto">{children}</main>
       </div>
     </div>
   );

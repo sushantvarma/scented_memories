@@ -20,11 +20,11 @@ export default async function HomePage() {
           <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-gold blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full bg-gold blur-3xl" />
         </div>
-        <div className="relative max-w-7xl mx-auto px-6 py-32 md:py-48 text-center">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-20 sm:py-32 md:py-48 text-center">
           <p className="text-xs tracking-[0.3em] uppercase text-gold mb-6">
             Home Fragrance &amp; Wellness
           </p>
-          <h1 className="font-serif text-5xl md:text-7xl font-light leading-tight mb-6">
+          <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl font-light leading-tight mb-6">
             Scents that tell<br />
             <em>your story</em>
           </h1>

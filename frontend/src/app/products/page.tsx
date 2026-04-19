@@ -41,8 +41,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         <p className="text-sm text-taupe mt-1">{productsPage.totalElements} products</p>
       </div>
 
-      <div className="flex gap-10">
-        {/* Sidebar */}
+      <div className="lg:flex lg:gap-10">
+        {/* Sidebar — mobile: toggle button above grid; desktop: left column */}
         <FilterSidebar categories={categories} tagsMap={tagsMap} currentFilters={filters} />
 
         {/* Main content */}

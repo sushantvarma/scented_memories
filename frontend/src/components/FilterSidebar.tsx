@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { Category, ProductFilters, Tag } from "@/types";
 
@@ -18,6 +19,7 @@ const DIMENSION_LABELS: Record<string, string> = {
 export default function FilterSidebar({ categories, tagsMap, currentFilters }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   function applyFilter(key: string, value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -41,9 +43,10 @@ export default function FilterSidebar({ categories, tagsMap, currentFilters }: P
 
   const activeTagIds = currentFilters.tagIds ?? [];
   const hasFilters = currentFilters.categoryId || activeTagIds.length > 0 || currentFilters.minPrice || currentFilters.maxPrice;
+  const activeFilterCount = (currentFilters.categoryId ? 1 : 0) + activeTagIds.length + (currentFilters.minPrice || currentFilters.maxPrice ? 1 : 0);
 
-  return (
-    <aside className="w-56 flex-shrink-0">
+  const filterContent = (
+    <>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xs tracking-[0.2em] uppercase font-medium text-espresso">Filters</h2>
         {hasFilters && (
@@ -143,6 +146,47 @@ export default function FilterSidebar({ categories, tagsMap, currentFilters }: P
           </button>
         </form>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* ── Mobile: filter toggle button ─────────────────────────────────── */}
+      <div className="lg:hidden mb-6">
+        <button
+          onClick={() => setMobileOpen((o) => !o)}
+          className="flex items-center gap-2 px-4 py-2.5 border border-sand text-xs tracking-widest uppercase text-espresso hover:border-espresso transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M3 4h18M7 8h10M11 12h4" />
+          </svg>
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="w-4 h-4 bg-espresso text-cream text-[10px] flex items-center justify-center rounded-full">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+
+        {/* Mobile filter panel */}
+        {mobileOpen && (
+          <div className="mt-4 p-5 border border-sand bg-white">
+            {filterContent}
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="w-full py-2.5 bg-espresso text-cream text-xs tracking-widest uppercase mt-2"
+            >
+              Show Results
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop: always-visible sidebar ──────────────────────────────── */}
+      <aside className="hidden lg:block w-56 flex-shrink-0">
+        {filterContent}
+      </aside>
+    </>
   );
 }

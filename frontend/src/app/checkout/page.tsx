@@ -91,15 +91,15 @@ export default function CheckoutPage() {
         <h1 className="font-serif text-4xl text-espresso font-light">Checkout</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 lg:gap-12">
         {/* Form */}
         <form onSubmit={handleSubmit} noValidate className="lg:col-span-3 space-y-6">
-          <div className="bg-white border border-sand p-8">
+          <div className="bg-white border border-sand p-5 sm:p-8">
             <h2 className="font-serif text-xl text-espresso mb-6">Shipping Details</h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {FIELDS.map(({ name, label, type, required, half }) => (
-                <div key={name} className={half ? "col-span-1" : "col-span-2"}>
+                <div key={name} className={half ? "col-span-1" : "sm:col-span-2 col-span-1"}>
                   <label htmlFor={name} className="block text-[10px] tracking-widest uppercase text-taupe mb-1.5">
                     {label}{required && <span className="text-gold ml-0.5">*</span>}
                   </label>

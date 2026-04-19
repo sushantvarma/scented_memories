@@ -31,31 +31,62 @@ export default function LoginPage() {
   }
 
   return (
-    <div>
-      <h1>Login</h1>
-      <form onSubmit={handleSubmit} noValidate>
-        <div>
-          <label htmlFor="email">Email</label>
-          <input
-            id="email" type="email" required
-            value={form.email}
-            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-          />
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-16 bg-cream">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <p className="text-xs tracking-[0.3em] uppercase text-gold mb-3">Welcome back</p>
+          <h1 className="font-serif text-3xl text-espresso font-light">Sign In</h1>
+          <div className="w-8 h-px bg-gold mx-auto mt-4" />
         </div>
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            id="password" type="password" required
-            value={form.password}
-            onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-          />
+
+        {/* Card */}
+        <div className="bg-white border border-sand p-6 sm:p-10">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
+            <div>
+              <label htmlFor="email" className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-1.5">
+                Email Address
+              </label>
+              <input
+                id="email" type="email" required
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+                className="input-field"
+                placeholder="you@example.com"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-1.5">
+                Password
+              </label>
+              <input
+                id="password" type="password" required
+                autoComplete="current-password"
+                value={form.password}
+                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                className="input-field"
+                placeholder="••••••••"
+              />
+            </div>
+            {error && (
+              <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 px-4 py-3">
+                {error}
+              </p>
+            )}
+            <button type="submit" disabled={loading} className="btn-primary w-full py-4">
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
+          </form>
         </div>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={loading}>
-          {loading ? "Logging in…" : "Login"}
-        </button>
-      </form>
-      <p>No account? <Link href="/auth/register">Register</Link></p>
+
+        <p className="text-center text-sm text-taupe mt-6">
+          No account?{" "}
+          <Link href="/auth/register" className="text-brown hover:text-espresso transition-colors underline underline-offset-2">
+            Register
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
