@@ -86,7 +86,14 @@ async function request<T>(
   let response: Response;
 
   try {
-    response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    response = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      headers,
+      // Disable Next.js fetch cache for SSR pages so product data is always
+      // fresh. Without this, Next.js 14 App Router caches fetch() responses
+      // indefinitely by default, causing stale image URLs and prices.
+      cache: "no-store",
+    });
   } catch (networkError) {
     // fetch() itself threw — network unreachable, DNS failure, or Render
     // gateway returning a non-HTTP response during cold start.
