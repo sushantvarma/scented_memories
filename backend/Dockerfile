@@ -38,9 +38,12 @@ EXPOSE 8080
 #   -XX:+UseContainerSupport  — respect cgroup memory limits inside the container
 #   -Dspring.profiles.active=prod — use production config
 #   -Djava.security.egd=...   — faster SecureRandom (avoids /dev/random blocking)
-ENTRYPOINT ["java", \
-  "-Xmx256m", \
-  "-XX:+UseContainerSupport", \
-  "-Dspring.profiles.active=prod", \
-  "-Djava.security.egd=file:/dev/./urandom", \
-  "-jar", "app.jar"]
+# Use shell form (not JSON array) so $PORT is expanded at runtime from
+# Render's injected environment variable.
+ENTRYPOINT exec java \
+  -Xmx256m \
+  -XX:+UseContainerSupport \
+  -Dspring.profiles.active=prod \
+  -Dserver.port=${PORT:-8080} \
+  -Djava.security.egd=file:/dev/./urandom \
+  -jar app.jar
