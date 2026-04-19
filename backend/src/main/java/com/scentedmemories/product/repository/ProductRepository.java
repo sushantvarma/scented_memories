@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,6 +27,17 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             WHERE p.slug = :slug AND p.active = true
             """)
     Optional<Product> findDetailBySlug(@Param("slug") String slug);
+
+    /**
+     * Fetch the primary image (position = 0) for all products in a paginated result.
+     * Used by the listing service to populate primaryImageUrl without N+1 queries.
+     * Returns a list of [productId, imageUrl] pairs.
+     */
+    @Query("""
+            SELECT pi.product.id, pi.url FROM ProductImage pi
+            WHERE pi.product.id IN :productIds AND pi.position = 0
+            """)
+    List<Object[]> findPrimaryImageUrlsByProductIds(@Param("productIds") List<Long> productIds);
 
     /**
      * Lightweight lookup — used internally when only the product entity is needed

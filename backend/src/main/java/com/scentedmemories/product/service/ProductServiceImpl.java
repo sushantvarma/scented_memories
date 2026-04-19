@@ -42,8 +42,25 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public Page<ProductSummaryResponse> listProducts(ProductFilterParams filters, Pageable pageable) {
         Specification<Product> spec = ProductSpecification.from(filters);
-        return productRepository.findAll(spec, pageable)
-                .map(this::toSummaryResponse);
+        Page<Product> page = productRepository.findAll(spec, pageable);
+
+        // Fetch primary images for all products on this page in a single query.
+        // Avoids N+1: without this, p.getImages() triggers a lazy load per product
+        // which fails with OSIV disabled (open-in-view=false).
+        List<Long> productIds = page.getContent().stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, String> primaryImageByProductId = productIds.isEmpty()
+                ? Map.of()
+                : productRepository.findPrimaryImageUrlsByProductIds(productIds).stream()
+                        .collect(Collectors.toMap(
+                                row -> (Long) row[0],
+                                row -> (String) row[1],
+                                (a, b) -> a   // keep first if duplicate
+                        ));
+
+        return page.map(p -> toSummaryResponse(p, primaryImageByProductId.get(p.getId())));
     }
 
     // ── Public: product detail ────────────────────────────────────────────────
@@ -116,19 +133,15 @@ public class ProductServiceImpl implements ProductService {
 
     /**
      * Summary response for the listing page.
-     * startingPrice = lowest price among active variants (null if no active variants).
-     * primaryImageUrl = image at position 0 (null if no images).
+     * primaryImageUrl is passed in from the batch-fetched map — never touches
+     * the lazy images collection to avoid N+1 / session-closed errors.
+     * startingPrice = lowest price among active variants (null if none).
      */
-    private ProductSummaryResponse toSummaryResponse(Product p) {
+    private ProductSummaryResponse toSummaryResponse(Product p, String primaryImageUrl) {
         BigDecimal startingPrice = p.getVariants().stream()
                 .filter(ProductVariant::isActive)
                 .map(ProductVariant::getPrice)
                 .min(Comparator.naturalOrder())
-                .orElse(null);
-
-        String primaryImageUrl = p.getImages().stream()
-                .min(Comparator.comparingInt(ProductImage::getPosition))
-                .map(ProductImage::getUrl)
                 .orElse(null);
 
         CategoryResponse category = new CategoryResponse(
