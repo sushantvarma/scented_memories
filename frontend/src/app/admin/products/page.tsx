@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiClient } from "@/lib/apiClient";
+import Link from "next/link";
+import { adminProductsApi, productsApi } from "@/lib/api/products";
 import type { Page, ProductSummary } from "@/types";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -19,8 +20,8 @@ export default function AdminProductsPage() {
   function fetchProducts(p: number, q?: string) {
     setLoading(true);
     const qs = q ? `&search=${encodeURIComponent(q)}` : "";
-    apiClient
-      .get<Page<ProductSummary>>(`/api/products?page=${p}&size=20${qs}`)
+    productsApi
+      .list({ page: p, size: 20, search: q })
       .then(setData)
       .finally(() => setLoading(false));
   }
@@ -31,7 +32,7 @@ export default function AdminProductsPage() {
     if (!confirm(`Deactivate "${name}"? It will be hidden from the store.`)) return;
     setDeactivating(id);
     try {
-      await apiClient.delete(`/api/admin/products/${id}`);
+      await adminProductsApi.deactivate(id);
       setData((prev) =>
         prev ? { ...prev, content: prev.content.filter((p) => p.id !== id) } : prev
       );
@@ -59,7 +60,7 @@ export default function AdminProductsPage() {
           </button>
         </form>
 
-        <a
+        <Link
           href="/admin/products/new"
           className="flex items-center gap-2 px-5 py-2.5 bg-espresso text-cream text-xs tracking-widest uppercase hover:bg-brown transition-colors"
         >
@@ -67,7 +68,7 @@ export default function AdminProductsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           Add Product
-        </a>
+        </Link>
       </div>
 
       {/* Table */}
@@ -140,12 +141,12 @@ export default function AdminProductsPage() {
                   {/* Actions */}
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <a
+                      <Link
                         href={`/admin/products/${p.id}/edit`}
                         className="text-xs tracking-widest uppercase text-brown hover:text-espresso transition-colors"
                       >
                         Edit
-                      </a>
+                      </Link>
                       <span className="text-sand">|</span>
                       <a
                         href={`/products/${p.slug}`}

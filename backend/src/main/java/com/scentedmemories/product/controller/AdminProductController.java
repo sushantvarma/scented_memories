@@ -20,6 +20,12 @@ public class AdminProductController {
         this.productService = productService;
     }
 
+    /** GET /api/admin/products/{id} — fetch full product detail for edit form */
+    @GetMapping("/{id}")
+    public ResponseEntity<ProductDetailResponse> getProduct(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.getProductById(id));
+    }
+
     /** POST /api/admin/products */
     @PostMapping
     public ResponseEntity<ProductDetailResponse> createProduct(@Valid @RequestBody CreateProductRequest request) {

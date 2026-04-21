@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/apiClient";
 import type {
   Category,
+  CreateProductRequest,
   Page,
   ProductDetail,
   ProductFilters,
@@ -39,4 +40,20 @@ export const productsApi = {
 
   listTags: () =>
     apiClient.get<Record<string, Tag[]>>("/api/tags"),
+};
+
+// ── Admin product API ─────────────────────────────────────────────────────────
+
+export const adminProductsApi = {
+  getById: (id: number) =>
+    apiClient.get<ProductDetail>(`/api/admin/products/${id}`),
+
+  create: (request: CreateProductRequest) =>
+    apiClient.post<ProductDetail>("/api/admin/products", request),
+
+  update: (id: number, request: CreateProductRequest) =>
+    apiClient.put<ProductDetail>(`/api/admin/products/${id}`, request),
+
+  deactivate: (id: number) =>
+    apiClient.delete<void>(`/api/admin/products/${id}`),
 };

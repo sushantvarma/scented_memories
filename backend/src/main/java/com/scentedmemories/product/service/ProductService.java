@@ -15,6 +15,9 @@ public interface ProductService {
     /** Public: single product detail by slug. */
     ProductDetailResponse getProductBySlug(String slug);
 
+    /** Admin: single product detail by ID (for edit form). */
+    ProductDetailResponse getProductById(Long id);
+
     /** Admin: create product with variants and tags. */
     ProductDetailResponse createProduct(CreateProductRequest request);
 

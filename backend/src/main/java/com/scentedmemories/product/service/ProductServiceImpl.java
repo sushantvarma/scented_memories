@@ -12,8 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -77,18 +79,141 @@ public class ProductServiceImpl implements ProductService {
         return toDetailResponse(product, variants);
     }
 
+    @Override
+    public ProductDetailResponse getProductById(Long id) {
+        Product product = productRepository.findDetailById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
+        List<ProductVariant> variants = variantRepository.findByProductIdOrderByPriceAsc(product.getId());
+        return toDetailResponse(product, variants);
+    }
+
     // ── Admin: product CRUD ───────────────────────────────────────────────────
 
     @Override
     @Transactional
     public ProductDetailResponse createProduct(CreateProductRequest request) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category not found: " + request.categoryId()));
+
+        // Generate slug from name: lowercase, spaces → hyphens, strip non-alphanumeric
+        String slug = request.name().toLowerCase()
+                .replaceAll("[^a-z0-9\\s-]", "")
+                .trim()
+                .replaceAll("\\s+", "-");
+
+        // Ensure slug uniqueness by appending a counter if needed
+        String baseSlug = slug;
+        int counter = 1;
+        while (productRepository.existsBySlug(slug)) {
+            slug = baseSlug + "-" + counter++;
+        }
+
+        Product product = new Product();
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setSlug(slug);
+        product.setCategory(category);
+        product.setActive(true);
+
+        // Images
+        if (request.imageUrls() != null) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                ProductImage img = new ProductImage();
+                img.setProduct(product);
+                img.setUrl(request.imageUrls().get(i));
+                img.setPosition(i);
+                product.getImages().add(img);
+            }
+        }
+
+        // Variants
+        for (VariantRequest vr : request.variants()) {
+            ProductVariant variant = new ProductVariant();
+            variant.setProduct(product);
+            variant.setLabel(vr.label());
+            variant.setPrice(vr.price());
+            variant.setStock(vr.stock());
+            variant.setActive(true);
+            product.getVariants().add(variant);
+        }
+
+        // Tags
+        if (request.tagIds() != null && !request.tagIds().isEmpty()) {
+            Set<Tag> tags = new HashSet<>(tagRepository.findAllById(request.tagIds()));
+            product.setTags(tags);
+        }
+
+        Product saved = productRepository.save(product);
+        List<ProductVariant> variants = variantRepository.findByProductIdOrderByPriceAsc(saved.getId());
+        return toDetailResponse(saved, variants);
     }
 
     @Override
     @Transactional
     public ProductDetailResponse updateProduct(Long id, CreateProductRequest request) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id));
+
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new EntityNotFoundException("Category not found: " + request.categoryId()));
+
+        product.setName(request.name());
+        product.setDescription(request.description());
+        product.setCategory(category);
+
+        // Replace images — clear existing, add new ones in order
+        product.getImages().clear();
+        if (request.imageUrls() != null) {
+            for (int i = 0; i < request.imageUrls().size(); i++) {
+                ProductImage img = new ProductImage();
+                img.setProduct(product);
+                img.setUrl(request.imageUrls().get(i));
+                img.setPosition(i);
+                product.getImages().add(img);
+            }
+        }
+
+        // Replace variants — update existing by label, add new, remove missing
+        List<ProductVariant> existingVariants = variantRepository.findByProductIdOrderByPriceAsc(product.getId());
+        Map<String, ProductVariant> existingByLabel = existingVariants.stream()
+                .collect(Collectors.toMap(ProductVariant::getLabel, v -> v));
+
+        // Remove variants not in the new request
+        Set<String> newLabels = request.variants().stream()
+                .map(VariantRequest::label)
+                .collect(Collectors.toSet());
+        product.getVariants().removeIf(v -> !newLabels.contains(v.getLabel()));
+
+        // Update or add variants
+        for (VariantRequest vr : request.variants()) {
+            if (existingByLabel.containsKey(vr.label())) {
+                // Update existing
+                ProductVariant existing = existingByLabel.get(vr.label());
+                existing.setPrice(vr.price());
+                existing.setStock(vr.stock());
+            } else {
+                // Add new
+                ProductVariant variant = new ProductVariant();
+                variant.setProduct(product);
+                variant.setLabel(vr.label());
+                variant.setPrice(vr.price());
+                variant.setStock(vr.stock());
+                variant.setActive(true);
+                product.getVariants().add(variant);
+            }
+        }
+
+        // Replace tags
+        if (request.tagIds() != null) {
+            Set<Tag> tags = new HashSet<>(tagRepository.findAllById(request.tagIds()));
+            product.setTags(tags);
+        } else {
+            product.getTags().clear();
+        }
+
+        Product saved = productRepository.save(product);
+        List<ProductVariant> variants = variantRepository.findByProductIdOrderByPriceAsc(saved.getId());
+        return toDetailResponse(saved, variants);
     }
 
     @Override

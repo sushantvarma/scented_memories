@@ -28,6 +28,15 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             """)
     Optional<Product> findDetailBySlug(@Param("slug") String slug);
 
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            LEFT JOIN FETCH p.category
+            LEFT JOIN FETCH p.tags
+            LEFT JOIN FETCH p.images
+            WHERE p.id = :id
+            """)
+    Optional<Product> findDetailById(@Param("id") Long id);
+
     /**
      * Fetch the primary image (position = 0) for all products in a paginated result.
      * Used by the listing service to populate primaryImageUrl without N+1 queries.

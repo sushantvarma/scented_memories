@@ -143,6 +143,23 @@ export interface AuthResponse {
   token: string;
 }
 
+// ── Admin product management types ───────────────────────────────────────────
+
+export interface VariantRequest {
+  label: string;
+  price: number;
+  stock: number;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  description?: string;
+  categoryId: number;
+  tagIds?: number[];
+  imageUrls?: string[];
+  variants: VariantRequest[];
+}
+
 // ── API error shape ───────────────────────────────────────────────────────────
 
 export interface ApiError {
