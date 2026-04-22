@@ -43,23 +43,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const { user, isAdmin, clearAuth, initFromStorage } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  useEffect(() => { initFromStorage(); }, [initFromStorage]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    // Don't redirect from the admin login page itself
-    if (pathname === "/admin/login") return;
+    initFromStorage();
+    setHydrated(true);
+  }, [initFromStorage]);
+
+  useEffect(() => {
+    if (!hydrated) return;                    // wait for localStorage read
+    if (pathname === "/admin/login") return;  // don't redirect from login page
 
     if (!user) {
       router.replace("/admin/login");
     } else if (!isAdmin) {
       router.replace("/");
     }
-  }, [user, isAdmin, router, pathname]);
+  }, [hydrated, user, isAdmin, router, pathname]);
 
   // Render the login page without the admin shell
   if (pathname === "/admin/login") {
     return <>{children}</>;
   }
+
+  // Still reading localStorage — show nothing to avoid flash
+  if (!hydrated) return null;
 
   if (!user || !isAdmin) return null;
 
