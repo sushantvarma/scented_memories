@@ -9,5 +9,12 @@ public record ProductFilterParams(
         List<Long> tagIds,
         BigDecimal minPrice,
         BigDecimal maxPrice,
-        String search
-) {}
+        String search,
+        boolean nameOnly   // if true, search matches name only (not description)
+) {
+    /** Convenience constructor for public API — always searches name + description. */
+    public ProductFilterParams(Long categoryId, List<Long> tagIds,
+                               BigDecimal minPrice, BigDecimal maxPrice, String search) {
+        this(categoryId, tagIds, minPrice, maxPrice, search, false);
+    }
+}

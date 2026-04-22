@@ -45,6 +45,12 @@ export const productsApi = {
 // ── Admin product API ─────────────────────────────────────────────────────────
 
 export const adminProductsApi = {
+  list: (page = 0, search?: string) => {
+    const params = new URLSearchParams({ page: String(page), size: "20" });
+    if (search) params.set("search", search);
+    return apiClient.get<Page<ProductSummary>>(`/api/admin/products?${params}`);
+  },
+
   getById: (id: number) =>
     apiClient.get<ProductDetail>(`/api/admin/products/${id}`),
 

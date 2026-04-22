@@ -74,13 +74,19 @@ public class ProductSpecification {
                 predicates.add(cb.exists(priceSubquery));
             }
 
-            // ── Search filter (case-insensitive LIKE on name OR description)
+            // ── Search filter ─────────────────────────────────────────────
+            // nameOnly=true  → match name only (used by admin product search)
+            // nameOnly=false → match name OR description (used by public storefront)
             if (StringUtils.hasText(f.search())) {
                 String pattern = "%" + f.search().toLowerCase() + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("name")), pattern),
-                        cb.like(cb.lower(root.get("description")), pattern)
-                ));
+                if (f.nameOnly()) {
+                    predicates.add(cb.like(cb.lower(root.get("name")), pattern));
+                } else {
+                    predicates.add(cb.or(
+                            cb.like(cb.lower(root.get("name")), pattern),
+                            cb.like(cb.lower(root.get("description")), pattern)
+                    ));
+                }
             }
 
             // Avoid duplicate rows from joins when using COUNT for pagination

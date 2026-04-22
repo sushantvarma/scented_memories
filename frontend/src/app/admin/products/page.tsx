@@ -19,9 +19,11 @@ export default function AdminProductsPage() {
 
   function fetchProducts(p: number, q?: string) {
     setLoading(true);
-    const qs = q ? `&search=${encodeURIComponent(q)}` : "";
-    productsApi
-      .list({ page: p, size: 20, search: q })
+    // Use admin endpoint — searches by product name only, not description.
+    // This prevents "lavender" matching Eucalyptus because its description mentions lavender.
+    const params = new URLSearchParams({ page: String(p), size: "20" });
+    if (q) params.set("search", q);
+    adminProductsApi.list(p, q)
       .then(setData)
       .finally(() => setLoading(false));
   }
