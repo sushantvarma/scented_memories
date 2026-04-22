@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { apiClient } from "@/lib/apiClient";
+import { productsApi } from "@/lib/api/products";
 import { ordersApi } from "@/lib/api/orders";
 import type { Page, ProductSummary, Order } from "@/types";
 
@@ -32,7 +32,6 @@ function StatCard({ label, value, sub, icon, href }: StatCardProps) {
       {sub && <p className="text-xs text-taupe mt-1">{sub}</p>}
     </div>
   );
-
   return href ? <Link href={href}>{content}</Link> : <div>{content}</div>;
 }
 
@@ -40,22 +39,50 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<Page<ProductSummary> | null>(null);
   const [orders, setOrders] = useState<Page<Order> | null>(null);
   const [pendingOrders, setPendingOrders] = useState<Page<Order> | null>(null);
+  const [recentOrders, setRecentOrders] = useState<Page<Order> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
+    setLoading(true);
     Promise.all([
-      apiClient.get<Page<ProductSummary>>("/api/products?size=1"),
-      ordersApi.listAll(undefined, 0, 1),
-      ordersApi.listAll("PENDING", 0, 5),
-    ]).then(([p, o, pending]) => {
+      productsApi.list({ size: 1 }),
+      ordersApi.listAll(undefined, 0, 1),          // total count
+      ordersApi.listAll("PENDING", 0, 5),           // pending for dashboard table
+      ordersApi.listAll(undefined, 0, 5),           // recent orders (all statuses)
+    ]).then(([p, o, pending, recent]) => {
       setProducts(p);
       setOrders(o);
       setPendingOrders(pending);
+      setRecentOrders(recent);
+      setLastRefreshed(new Date());
     }).finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => { fetchData(); }, [fetchData]);
+
   return (
     <div className="space-y-8">
+      {/* Header with refresh */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-taupe">
+            Last updated: {lastRefreshed.toLocaleTimeString("en-IN")}
+          </p>
+        </div>
+        <button
+          onClick={fetchData}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-widest uppercase text-brown hover:border-brown transition-colors disabled:opacity-40"
+        >
+          <svg className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -105,10 +132,10 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Pending orders table */}
+      {/* Recent orders table — all statuses, most recent first */}
       <div className="bg-white border border-sand">
-        <div className="px-6 py-4 border-b border-sand flex items-center justify-between">
-          <h2 className="font-serif text-lg text-espresso">Pending Orders</h2>
+        <div className="px-4 sm:px-6 py-4 border-b border-sand flex items-center justify-between">
+          <h2 className="font-serif text-lg text-espresso">Recent Orders</h2>
           <Link href="/admin/orders" className="text-xs tracking-widest uppercase text-brown hover:text-espresso transition-colors">
             View all →
           </Link>
@@ -116,35 +143,49 @@ export default function AdminDashboard() {
 
         {loading ? (
           <div className="p-8 text-center text-taupe text-sm">Loading…</div>
-        ) : !pendingOrders?.content.length ? (
+        ) : !recentOrders?.content.length ? (
           <div className="p-8 text-center">
-            <p className="text-sm text-taupe">No pending orders. You&apos;re all caught up!</p>
+            <p className="text-sm text-taupe">No orders yet.</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-sand">
-                {["Order ID", "Customer", "Date", "Items", "Total"].map((h) => (
-                  <th key={h} className="px-6 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pendingOrders.content.map((order) => (
-                <tr key={order.id} className="border-b border-sand/50 hover:bg-cream/50 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-espresso">#{order.id}</td>
-                  <td className="px-6 py-4 text-sm text-brown">{order.customerName}</td>
-                  <td className="px-6 py-4 text-sm text-taupe">
-                    {new Date(order.createdAt).toLocaleDateString("en-IN")}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-taupe">{order.items.length} item{order.items.length !== 1 ? "s" : ""}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-espresso">₹{order.totalAmount.toFixed(2)}</td>
+          /* overflow-x-auto enables horizontal scroll on mobile */
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[500px]">
+              <thead>
+                <tr className="border-b border-sand">
+                  {["Order ID", "Customer", "Date", "Items", "Total", "Status"].map((h) => (
+                    <th key={h} className="px-4 sm:px-6 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium whitespace-nowrap">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentOrders.content.map((order) => (
+                  <tr key={order.id} className="border-b border-sand/50 hover:bg-cream/50 transition-colors">
+                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-espresso whitespace-nowrap">#{order.id}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-brown">{order.customerName}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-taupe whitespace-nowrap">
+                      {new Date(order.createdAt).toLocaleDateString("en-IN")}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm text-taupe">{order.items.length}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm font-medium text-espresso whitespace-nowrap">₹{order.totalAmount.toFixed(2)}</td>
+                    <td className="px-4 sm:px-6 py-4">
+                      <span className={`text-[10px] tracking-widest uppercase px-2 py-1 font-medium whitespace-nowrap ${
+                        order.status === "PENDING"    ? "bg-amber-100 text-amber-700" :
+                        order.status === "PROCESSING" ? "bg-blue-100 text-blue-700" :
+                        order.status === "SHIPPED"    ? "bg-purple-100 text-purple-700" :
+                        order.status === "FULFILLED"  ? "bg-green-100 text-green-700" :
+                                                        "bg-red-100 text-red-600"
+                      }`}>
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

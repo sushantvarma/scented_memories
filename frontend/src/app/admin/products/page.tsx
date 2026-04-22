@@ -72,12 +72,13 @@ export default function AdminProductsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-sand overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white border border-sand">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-sand bg-cream/50">
               {["Product", "Category", "Starting Price", "Status", "Actions"].map((h) => (
-                <th key={h} className="px-6 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium">
+                <th key={h} className="px-6 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -170,6 +171,7 @@ export default function AdminProductsPage() {
             )}
           </tbody>
         </table>
+        </div>{/* end overflow-x-auto */}
 
         {/* Pagination */}
         {data && data.totalPages > 1 && (

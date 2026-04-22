@@ -77,12 +77,14 @@ export default function AdminOrdersPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-sand overflow-hidden">
-        <table className="w-full">
+      <div className="bg-white border border-sand">
+        {/* overflow-x-auto enables horizontal scroll on mobile */}
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-sand bg-cream/50">
               {["Order", "Customer", "Date", "Items", "Total", "Status", "Actions"].map((h) => (
-                <th key={h} className="px-5 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium">
+                <th key={h} className="px-5 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -105,20 +107,20 @@ export default function AdminOrdersPage() {
                     className="border-b border-sand/50 hover:bg-cream/30 transition-colors cursor-pointer"
                     onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                   >
-                    <td className="px-5 py-4 text-sm font-medium text-espresso">#{order.id}</td>
+                    <td className="px-5 py-4 text-sm font-medium text-espresso whitespace-nowrap">#{order.id}</td>
                     <td className="px-5 py-4">
                       <p className="text-sm text-espresso">{order.customerName}</p>
                       <p className="text-xs text-taupe">{order.customerEmail}</p>
                     </td>
-                    <td className="px-5 py-4 text-xs text-taupe">
+                    <td className="px-5 py-4 text-xs text-taupe whitespace-nowrap">
                       {new Date(order.createdAt).toLocaleDateString("en-IN", {
                         day: "numeric", month: "short", year: "numeric"
                       })}
                     </td>
                     <td className="px-5 py-4 text-sm text-taupe">{order.items.length}</td>
-                    <td className="px-5 py-4 font-serif text-base text-espresso">₹{order.totalAmount.toFixed(2)}</td>
+                    <td className="px-5 py-4 font-serif text-base text-espresso whitespace-nowrap">₹{order.totalAmount.toFixed(2)}</td>
                     <td className="px-5 py-4">
-                      <span className={`text-[10px] tracking-widest uppercase px-2 py-1 font-medium ${STATUS_STYLES[order.status]}`}>
+                      <span className={`text-[10px] tracking-widest uppercase px-2 py-1 font-medium whitespace-nowrap ${STATUS_STYLES[order.status]}`}>
                         {order.status}
                       </span>
                     </td>
@@ -130,7 +132,7 @@ export default function AdminOrdersPage() {
                               key={next}
                               onClick={() => handleStatusUpdate(order.id, next)}
                               disabled={updating === order.id}
-                              className={`px-2.5 py-1 text-[10px] tracking-widest uppercase border transition-colors disabled:opacity-40 ${
+                              className={`px-2.5 py-1 text-[10px] tracking-widest uppercase border transition-colors disabled:opacity-40 whitespace-nowrap ${
                                 next === "CANCELLED"
                                   ? "border-red-200 text-red-500 hover:bg-red-50"
                                   : "border-sand text-brown hover:border-brown hover:bg-cream"
@@ -141,7 +143,7 @@ export default function AdminOrdersPage() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[10px] text-taupe tracking-wide">Terminal</span>
+                        <span className="text-[10px] text-taupe tracking-wide whitespace-nowrap">Terminal</span>
                       )}
                     </td>
                   </tr>
@@ -191,6 +193,7 @@ export default function AdminOrdersPage() {
             )}
           </tbody>
         </table>
+        </div>{/* end overflow-x-auto */}
 
         {/* Pagination */}
         {data && data.totalPages > 1 && (
