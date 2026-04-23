@@ -7,11 +7,11 @@ Reference this file any time you need to redeploy or set up a new environment.
 
 ## Stack
 
-| Layer | Service | URL pattern |
+| Layer | Service | URL |
 |---|---|---|
-| Database | Neon PostgreSQL | `ep-xxx-pooler.region.aws.neon.tech` |
-| Backend | Render (free tier) | `https://scented-memories-backend.onrender.com` |
-| Frontend | Vercel | `https://scented-memories.vercel.app` |
+| Database | Neon PostgreSQL | `ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech` |
+| Backend | Render (Docker / Java 21) | `https://scented-memories-backend.onrender.com` |
+| Frontend | Vercel (Next.js 14) | `https://scented-memories.vercel.app` |
 
 ---
 
@@ -37,24 +37,24 @@ Neon is a serverless PostgreSQL provider. The schema and seed data are managed b
 2. Open your project → **Dashboard**
 3. Click **Connection Details** (top right)
 4. Switch connection type to **Pooled connection**
-5. Copy the connection string:
+5. Copy the connection string — it looks like:
    ```
-   postgresql://neondb_owner:<password>@ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+   postgresql://neondb_owner:<password>@ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
    ```
 
-### 1.2 Convert to JDBC format
+### 1.2 Split into three Render environment variables
 
-Replace `postgresql://` with `jdbc:postgresql://`:
+The PostgreSQL JDBC driver does not support credentials embedded in the URL. Use three separate variables:
 
-```
-jdbc:postgresql://ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-```
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | `jdbc:postgresql://ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require` |
+| `DB_USERNAME` | `neondb_owner` |
+| `DB_PASSWORD` | `<your-neon-password>` |
 
 > **Important:** Always use the **pooler** endpoint (`ep-xxx-pooler.region...`), not the direct endpoint.
-> The pooler routes through PgBouncer and keeps connections within Neon's free-tier limit.
-> Always include `?sslmode=require&channel_binding=require` — Neon rejects unencrypted connections.
-
-Save this JDBC URL — you will paste it into Render in Step 2.
+> Include `?sslmode=require` — Neon rejects unencrypted connections.
+> Do NOT include `channel_binding=require` — the JDBC driver does not support this parameter.
 
 ### 1.3 What Flyway does on first backend startup
 
@@ -65,6 +65,8 @@ When the backend starts for the first time against a fresh Neon database, Flyway
 | `V1__create_schema.sql` | All 9 tables, constraints, indexes |
 | `V2__seed_reference_data.sql` | 6 categories, 25 tags |
 | `V3__seed_products.sql` | 10 products with variants, images, tags, and the admin user |
+| `V4__update_product_images.sql` | Update image URLs to local `/public/` paths |
+| `V5__update_admin_password.sql` | Set admin password |
 
 No manual intervention required.
 
@@ -72,26 +74,16 @@ No manual intervention required.
 
 ## Step 2 — Backend (Render)
 
-### 2.1 Create the web service
+### 2.1 Create the web service via Blueprint
 
 1. Go to [render.com](https://render.com) and sign in
-2. Click **New** → **Web Service**
+2. Click **New** → **Blueprint**
 3. Connect your GitHub account (first time only)
-4. Select the `scented-memories` repository
-5. Render detects `render.yaml` at the repo root — click **Apply** to use it
+4. Select the `scented_memories` repository
+5. Render reads `render.yaml` at the repo root — it uses `runtime: docker`
+6. Click **Apply**
 
-**If Render does not detect `render.yaml`**, configure manually:
-
-| Field | Value |
-|---|---|
-| Name | `scented-memories-backend` |
-| Region | Singapore |
-| Root Directory | `backend` |
-| Runtime | Java |
-| Build Command | `./mvnw clean package -DskipTests -q` |
-| Start Command | `java -Xmx256m -XX:+UseContainerSupport -Dspring.profiles.active=prod -Djava.security.egd=file:/dev/./urandom -jar target/scented-memories-backend-0.0.1-SNAPSHOT.jar` |
-| Plan | Free |
-| Health Check Path | `/health` |
+> **Note:** Render Blueprint does not support `runtime: java`. The service uses Docker (`backend/Dockerfile`) which builds with Eclipse Temurin JDK 21.
 
 ### 2.2 Set environment variables
 
@@ -99,11 +91,13 @@ In the Render dashboard → your service → **Environment** tab → add:
 
 | Key | Value | Notes |
 |---|---|---|
-| `DATABASE_URL` | JDBC URL from Step 1.2 | Required. Includes credentials and SSL params. |
-| `JWT_SECRET` | Output of `openssl rand -base64 48` | Required. Minimum 32 characters, random. |
-| `FRONTEND_URL` | *(leave blank for now)* | Set in Step 4 after Vercel deploys. |
+| `DATABASE_URL` | `jdbc:postgresql://ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require` | No credentials in URL |
+| `DB_USERNAME` | `neondb_owner` | From Neon dashboard |
+| `DB_PASSWORD` | `<your-neon-password>` | From Neon dashboard |
+| `JWT_SECRET` | Output of `openssl rand -base64 48` | Minimum 32 characters |
+| `FRONTEND_URL` | *(leave blank for now)* | Set in Step 4 after Vercel deploys |
 
-> **Generating JWT_SECRET:** Run this in your terminal and paste the output:
+> **Generating JWT_SECRET:**
 > ```bash
 > openssl rand -base64 48
 > ```
@@ -112,23 +106,23 @@ In the Render dashboard → your service → **Environment** tab → add:
 
 ### 2.3 Deploy
 
-Click **Save Changes** then **Deploy** (or it starts automatically after setup).
+Click **Save Changes** — Render deploys automatically.
 
 Watch the **Logs** tab. A successful startup looks like:
 
 ```
-Flyway: Successfully applied 3 migrations to schema "public"
+Flyway: Successfully applied 5 migrations to schema "public"
 HikariPool-1 - Start completed
 Tomcat started on port(s): 10000
 Started ScentedMemoriesApplication in 18.4 seconds
 ```
 
-First deploy takes **3–5 minutes** (Maven build + JVM startup).
+First deploy takes **4–6 minutes** (Docker build pulls base images + Maven build).
+Subsequent deploys are faster (~2–3 min) because Docker layers are cached.
 
 ### 2.4 Verify the backend is live
 
 ```bash
-# Replace with your actual Render URL
 curl https://scented-memories-backend.onrender.com/health
 # Expected: UP
 
@@ -167,7 +161,7 @@ Copy your Render service URL — you need it for Step 3.
 
 > **Critical:** This variable must be set **before** the first build.
 > Next.js inlines `NEXT_PUBLIC_*` variables at build time — they are not read at runtime.
-> If it is missing, the build fails immediately with a clear error message.
+> If it is missing, the build fails with a clear error message.
 
 ### 3.3 Deploy
 
@@ -196,9 +190,9 @@ Now that both services are live, lock down CORS to your Vercel domain.
 3. Click **Save Changes** — Render redeploys automatically (~2 minutes)
 
 > Until this step is done, the backend accepts requests from any origin (`*`).
-> This is intentional for the initial deployment window but must be tightened before going live.
+> Tighten this before going live.
 
-**To allow multiple origins** (e.g. stable URL + preview deployments), use a comma-separated list:
+**To allow multiple origins** (e.g. stable URL + Vercel preview deployments):
 ```
 https://scented-memories.vercel.app,https://scented-memories-git-main-user.vercel.app
 ```
@@ -219,11 +213,8 @@ https://scented-memories.vercel.app
 https://scented-memories.vercel.app/admin/login
 
 Email:    admin@scentedmemories.in
-Password: Admin@123
+Password: sushant123
 ```
-
-> **Change this password immediately after first login.**
-> The seed credentials are in the public repository (`V3__seed_products.sql`).
 
 ### Backend API (direct access)
 ```
@@ -241,7 +232,9 @@ https://scented-memories-backend.onrender.com/swagger-ui/index.html
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | Neon JDBC URL with pooler endpoint and SSL params |
+| `DATABASE_URL` | Yes | Neon JDBC URL — pooler endpoint, `?sslmode=require`, no credentials |
+| `DB_USERNAME` | Yes | Neon database username |
+| `DB_PASSWORD` | Yes | Neon database password |
 | `JWT_SECRET` | Yes | Random string ≥ 32 chars. Generate: `openssl rand -base64 48` |
 | `FRONTEND_URL` | Yes (after Step 3) | Exact Vercel URL. Comma-separate for multiple origins. |
 | `PORT` | Auto | Injected by Render. Do not set manually. |
@@ -251,6 +244,42 @@ https://scented-memories-backend.onrender.com/swagger-ui/index.html
 | Variable | Required | Description |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | Yes | Render backend URL. Must be set before build. |
+
+---
+
+## Local Development
+
+### Backend
+
+```bash
+cd backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+Uses `application-dev.properties` (gitignored). This file must contain:
+```properties
+spring.datasource.url=jdbc:postgresql://ep-cold-frost-a1rsrjdw-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+spring.datasource.username=neondb_owner
+spring.datasource.password=<your-password>
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+app.jwt.secret=dev-secret-change-in-production-must-be-at-least-32-chars
+app.cors.allowed-origins=http://localhost:3000
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm run dev
+```
+
+Reads `frontend/.env.local`:
+```
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
 
 ---
 
@@ -264,7 +293,18 @@ Push to the branch connected to Vercel, or go to Vercel → your project → **D
 
 ### After changing environment variables
 - **Render:** Saves trigger an automatic redeploy.
-- **Vercel:** Go to **Deployments** → click the latest deployment → **Redeploy** (env vars are baked in at build time for `NEXT_PUBLIC_*`).
+- **Vercel:** Go to **Deployments** → click the latest deployment → **Redeploy** (`NEXT_PUBLIC_*` vars are baked in at build time).
+
+---
+
+## Adding Product Images
+
+Product images are served from `frontend/public/`. To add a new image:
+
+1. Drop the file into `frontend/public/` with a URL-safe filename (e.g. `rose-aroma-oil.jpeg`)
+2. Commit and push — Vercel deploys it automatically
+3. In the admin panel → Edit Product → set the image URL to `/rose-aroma-oil.jpeg`
+4. Click **Save & Publish**
 
 ---
 
@@ -285,13 +325,10 @@ Run this ~1 minute before your demo. The service stays warm for 15 minutes after
 
 ## Post-Launch Security Checklist
 
-After confirming everything works:
-
-- [ ] Change the admin password from `Admin@123` to something strong
 - [ ] Confirm `FRONTEND_URL` on Render is set to the exact Vercel URL (not `*`)
-- [ ] Confirm `JWT_SECRET` is at least 32 random characters and not guessable
+- [ ] Confirm `JWT_SECRET` is at least 32 random characters
 - [ ] Confirm `spring.jpa.show-sql=false` in `application.properties` (already set)
-- [ ] Decide whether to keep Swagger UI public (`/swagger-ui/**`) or restrict it
+- [ ] Change admin password if still using the default
 
 ---
 
@@ -299,8 +336,9 @@ After confirming everything works:
 
 | File | Purpose |
 |---|---|
-| `render.yaml` | Render service definition (build/start commands, env var keys) |
+| `render.yaml` | Render Blueprint config (`runtime: docker`) |
+| `backend/Dockerfile` | Multi-stage Docker build (JDK 21 build → JRE 21 runtime) |
 | `frontend/next.config.mjs` | Vercel build config and env var validation |
 | `backend/src/main/resources/application.properties` | Production Spring Boot config |
-| `backend/src/main/resources/db/migration/` | Flyway migrations (schema + seed data) |
+| `backend/src/main/resources/db/migration/` | Flyway migrations V1–V5 |
 | `DEPLOYMENT_CHECKLIST.md` | Step-by-step validation after each deployment |

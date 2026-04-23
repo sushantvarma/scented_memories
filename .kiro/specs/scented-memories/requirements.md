@@ -292,13 +292,14 @@ This document defines the requirements for **ScentedMemories**, a full-stack e-c
 
 #### Acceptance Criteria
 
-1. THE Frontend SHALL provide an admin product list page showing all products with name, category, variant count, and active status.
-2. THE Frontend SHALL provide an "Add Product" form allowing the admin to enter: name, description, category, tags, images (via URL), and one or more variants (each with label, price, and initial stock).
-3. WHEN an admin submits a valid "Add Product" form, THE Backend SHALL persist the product and all its variants and return the created product.
-4. THE Frontend SHALL provide an "Edit Product" form pre-populated with the existing product data, allowing the admin to modify any field.
-5. WHEN an admin submits a valid "Edit Product" form, THE Backend SHALL update the product record and return the updated product.
-6. WHEN an admin deletes a product, THE Backend SHALL mark the product as inactive rather than permanently deleting it, so that existing order history referencing the product remains intact.
+1. THE Frontend SHALL provide an admin product list page showing all products with name, image, category, starting price, and active status.
+2. THE Frontend SHALL provide an "Add Product" form allowing the admin to enter: name, description, category, image URLs (with live preview), and one or more variants (each with label, price, and initial stock), and tags.
+3. WHEN an admin submits a valid "Add Product" form and clicks "Save & Publish", THE Backend SHALL persist the product and all its variants and THE Frontend SHALL navigate to the product list. The product appears in the public catalog immediately.
+4. THE Frontend SHALL provide an "Edit Product" form pre-populated with the existing product data, allowing the admin to modify any field including prices, stock, images, and tags.
+5. WHEN an admin submits a valid "Edit Product" form and clicks "Save & Publish", THE Backend SHALL update the product record and changes SHALL be visible in the public storefront on the next page load.
+6. WHEN an admin deactivates a product, THE Backend SHALL mark the product as inactive (`active = false`) rather than permanently deleting it, so that existing order history referencing the product remains intact.
 7. IF an admin submits a product form with missing required fields (name, category, at least one variant with price), THEN THE Backend SHALL return a validation error and THE Frontend SHALL display the errors inline.
+8. THE admin product search SHALL match product names only (not descriptions), so that searching "lavender" returns only products named "Lavender Essential Oil" and not products whose description mentions lavender.
 
 ---
 
@@ -322,10 +323,12 @@ This document defines the requirements for **ScentedMemories**, a full-stack e-c
 #### Acceptance Criteria
 
 1. THE Frontend SHALL display an admin order list page showing all orders with: order ID, customer name, order date, item count, total amount, and current status.
-2. THE Frontend SHALL support sorting the order list by order date (newest first by default).
-3. WHEN an admin clicks an order, THE Frontend SHALL display the full order detail: customer shipping address, all order items with variant labels and quantities, and the order total.
-4. THE Frontend SHALL allow the admin to update the order status from a defined set: Pending, Processing, Shipped, Fulfilled, Cancelled.
-5. WHEN an admin updates an order status, THE Backend SHALL persist the new status and return the updated order.
+2. THE Frontend SHALL support filtering the order list by status (All, PENDING, PROCESSING, SHIPPED, FULFILLED, CANCELLED).
+3. WHEN an admin clicks an order row, THE Frontend SHALL expand the row to display the full order detail: customer shipping address, all order items with variant labels and quantities, and the order total.
+4. THE Frontend SHALL allow the admin to update the order status from a defined set: Pending → Processing, Processing → Shipped, Shipped → Fulfilled, and Pending/Processing → Cancelled.
+5. WHEN an admin updates an order status, THE Backend SHALL persist the new status and THE Frontend SHALL reflect the change immediately without a page reload.
+6. THE admin dashboard SHALL display a "Recent Orders" table showing the 5 most recent orders across all statuses, with a Refresh button and a "Last updated" timestamp.
+7. THE admin order and product tables SHALL support horizontal scrolling on mobile devices so all columns are accessible.
 
 ---
 

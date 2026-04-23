@@ -26,8 +26,8 @@ Content-Type: text/plain;charset=UTF-8
 UP
 ```
 
-**If it hangs for 30–50 s** — normal on first request after a cold start (Render free tier spins down after inactivity). Wait and retry.  
-**If it returns 502/503 after 60 s** — the JVM failed to start. Check Render logs (see Phase 5).
+**If it hangs for 30–50 s** — normal cold start (Render free tier spins down after inactivity). Wait and retry.
+**If it returns 502/503 after 60 s** — JVM failed to start. Check Render logs.
 
 ---
 
@@ -46,17 +46,15 @@ curl -s $BACKEND/test | python3 -m json.tool
 }
 ```
 
-**If you get HTML** — Spring Boot is returning its default error page. The app started but something is wrong with the request routing. Check that `BACKEND` has no trailing slash.
-
 ---
 
-### 1.3 Database is connected and migrations ran
+### 1.3 Database connected and all migrations ran
 
 ```bash
 curl -s $BACKEND/api/categories | python3 -m json.tool
 ```
 
-**Expected** — array of 6 categories seeded by V2:
+**Expected** — 6 categories from V2 migration:
 ```json
 [
   { "id": 1, "name": "Essential Oils",  "slug": "essential-oils"  },
@@ -68,27 +66,23 @@ curl -s $BACKEND/api/categories | python3 -m json.tool
 ]
 ```
 
-**If you get `[]`** — DB connected but migrations didn't run. Check `spring.flyway.enabled=true` and that `DATABASE_URL` points to the correct Neon database.  
-**If you get 500** — DB connection failed. Verify `DATABASE_URL` on Render includes `?sslmode=require&channel_binding=require` and uses the **pooler** endpoint.
+**If you get `[]`** — DB connected but migrations didn't run. Check `DATABASE_URL`, `DB_USERNAME`, `DB_PASSWORD` on Render.
+**If you get 500** — DB connection failed. Verify credentials and that `DATABASE_URL` uses the pooler endpoint with `?sslmode=require`.
 
 ---
 
-### 1.4 Products are seeded
+### 1.4 Products are seeded with correct image URLs
 
 ```bash
-curl -s "$BACKEND/api/products?size=5" | python3 -m json.tool
+curl -s "$BACKEND/api/products?size=3" | python3 -m json.tool | grep primaryImageUrl
 ```
 
-**Expected** — `totalElements: 10`, first page of 5 products from V3 seed.
-
-```bash
-# Verify a specific product by slug
-curl -s $BACKEND/api/products/lavender-essential-oil | python3 -m json.tool
+**Expected** — local paths like `/lavender-essential-oil.jpeg` (not the old CDN URLs):
+```
+"primaryImageUrl": "/lavender-essential-oil.jpeg",
 ```
 
-**Expected** — full product detail with 2 variants (10ml ₹349, 30ml ₹849) and tags.
-
-**If you get 404** — V3 migration didn't run or ran with errors. Check Render logs for Flyway output at startup.
+**If you see `https://images.scentedmemories.in/...`** — V4 migration didn't run. Check Render logs for Flyway output.
 
 ---
 
@@ -97,7 +91,7 @@ curl -s $BACKEND/api/products/lavender-essential-oil | python3 -m json.tool
 ```bash
 curl -s -X POST $BACKEND/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@scentedmemories.in","password":"Admin@123"}' \
+  -d '{"email":"admin@scentedmemories.in","password":"sushant123"}' \
   | python3 -m json.tool
 ```
 
@@ -112,20 +106,19 @@ curl -s -X POST $BACKEND/api/auth/login \
 }
 ```
 
-**If you get 401** — admin user not seeded. Check V3 migration ran. The seed uses `ON CONFLICT DO NOTHING` so re-running is safe.  
-**If you get 500** — `JWT_SECRET` env var is missing or too short (must be ≥ 32 chars).
+**If you get 401** — V5 migration (password update) didn't run, or password was changed again. Check Render logs.
 
-Save the token for Phase 1.6:
+Save the token:
 ```bash
 TOKEN=$(curl -s -X POST $BACKEND/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@scentedmemories.in","password":"Admin@123"}' \
+  -d '{"email":"admin@scentedmemories.in","password":"sushant123"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 ```
 
 ---
 
-### 1.6 Protected endpoint respects JWT
+### 1.6 Protected endpoints respect JWT
 
 ```bash
 # Should succeed with token
@@ -141,11 +134,21 @@ curl -s "$BACKEND/api/admin/orders"
 { "status": 401, "message": "Unauthorized" }
 ```
 
-**If the browser shows a CORS error instead of 401** — the `AuthenticationEntryPoint` in `SecurityConfig` is not wired. Verify the backend was redeployed after the last `SecurityConfig.java` change.
+---
+
+### 1.7 Admin product search is name-only
+
+```bash
+# Should return only Lavender Essential Oil, NOT Eucalyptus
+curl -s "$BACKEND/api/admin/products?search=lavender" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool | grep '"name"'
+```
+
+**Expected** — only products with "lavender" in the name, not in the description.
 
 ---
 
-### 1.7 CORS preflight passes from Vercel origin
+### 1.8 CORS preflight passes from Vercel origin
 
 ```bash
 curl -s -i -X OPTIONS $BACKEND/api/products \
@@ -154,16 +157,15 @@ curl -s -i -X OPTIONS $BACKEND/api/products \
   -H "Access-Control-Request-Headers: Authorization"
 ```
 
-**Expected headers in response**
+**Expected headers**
 ```
 Access-Control-Allow-Origin: https://scented-memories.vercel.app
 Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
-Access-Control-Allow-Headers: *
 Access-Control-Allow-Credentials: true
 Access-Control-Max-Age: 3600
 ```
 
-**If `Access-Control-Allow-Origin` is missing** — `FRONTEND_URL` on Render is wrong or not set. It must exactly match the Vercel URL (no trailing slash, correct protocol).
+**If `Access-Control-Allow-Origin` is missing** — `FRONTEND_URL` on Render is wrong or not set.
 
 ---
 
@@ -173,38 +175,31 @@ Access-Control-Max-Age: 3600
 
 Open `$FRONTEND` in a browser.
 
-- [ ] Page renders without a blank white screen
-- [ ] Navbar shows "ScentedMemories" logo and "Shop" link
-- [ ] Hero section is visible
+- [ ] Page renders — hero section, featured products, category grid visible
+- [ ] Navbar shows company logo + "ScentedMemories" text
 - [ ] No console errors about `NEXT_PUBLIC_API_URL`
 
-**If the build failed on Vercel** — `NEXT_PUBLIC_API_URL` was not set before the build. Add it in Vercel → Settings → Environment Variables → Production, then redeploy.
+---
+
+### 2.2 Product images appear
+
+- [ ] Product cards on homepage show product images (not the ✦ placeholder)
+- [ ] Product detail page shows the product image
+
+**If images are missing** — check that Render has redeployed and V4 migration ran (see 1.4).
 
 ---
 
-### 2.2 Homepage calls the backend
-
-Open browser DevTools → Network tab, then reload `$FRONTEND`.
-
-- [ ] Request to `$BACKEND/api/products?size=8...` returns 200
-- [ ] Request to `$BACKEND/api/categories` returns 200
-- [ ] Featured products grid renders (8 products)
-- [ ] Category grid renders (6 categories)
-
-**If requests show as pending for 30+ s** — Render cold start. The frontend retries automatically for up to ~35 s. Normal on first visit after inactivity.  
-**If requests fail with CORS error** — `FRONTEND_URL` on Render doesn't match the Vercel URL. Fix it and redeploy the backend.
-
----
-
-### 2.3 Product listing page
+### 2.3 Product listing and filters
 
 Navigate to `$FRONTEND/products`.
 
-- [ ] 10 products displayed (2 pages of 5, or 1 page of 10 depending on default size)
-- [ ] Filter sidebar shows 6 categories and all tags grouped by dimension
-- [ ] Search box is present
-- [ ] URL updates when a filter is applied (e.g. `?categoryId=1`)
-- [ ] Pagination controls appear if more than one page
+- [ ] Products listed with images, names, prices
+- [ ] On mobile: "Filters" toggle button appears above the grid
+- [ ] On desktop: filter sidebar visible on the left
+- [ ] Category filter narrows results correctly
+- [ ] Search for "Lavender" returns only Lavender Essential Oil (not Eucalyptus)
+- [ ] URL updates when filters are applied (`?categoryId=1`)
 
 ---
 
@@ -212,12 +207,10 @@ Navigate to `$FRONTEND/products`.
 
 Navigate to `$FRONTEND/products/lavender-essential-oil`.
 
-- [ ] Product name "Lavender Essential Oil" renders
-- [ ] Description is visible
+- [ ] Product name, description, image, tags visible
 - [ ] Two variant buttons: "10ml" (₹349) and "30ml" (₹849)
-- [ ] Tags show: Lavender, Calming, Sleep, Meditation, Stress Relief
+- [ ] Selecting a variant shows the price
 - [ ] Page `<title>` is "Lavender Essential Oil | ScentedMemories"
-- [ ] Open Graph tags present (check with `curl -s $FRONTEND/products/lavender-essential-oil | grep og:`)
 
 ---
 
@@ -225,89 +218,18 @@ Navigate to `$FRONTEND/products/lavender-essential-oil`.
 
 ### 3.1 Add to cart
 
-On the Lavender Essential Oil detail page:
+- [ ] Select "10ml" variant on Lavender Essential Oil
+- [ ] Click "Add to Cart" — button shows "✓ Added to Cart"
+- [ ] Cart badge in navbar shows "1"
+- [ ] Navigate to `/cart` — item appears correctly
 
-- [ ] Select "10ml" variant — price ₹349 appears
-- [ ] Click "Add to Cart" — button briefly shows "✓ Added to Cart"
-- [ ] Cart icon in navbar shows badge with count "1"
-- [ ] Navigate to `$FRONTEND/cart` — item appears with correct name, variant, price
+### 3.2 Checkout — guest order
 
----
-
-### 3.2 Cart operations
-
-On the cart page:
-
-- [ ] Quantity `+` button increments quantity
-- [ ] Quantity `−` button decrements; at 1 → 0 removes the item
-- [ ] "Remove" link removes the item immediately
-- [ ] Subtotal updates correctly (price × quantity)
-- [ ] "Clear cart" removes all items and shows empty state
-- [ ] Empty cart redirects to `/products` when "Continue Shopping" is clicked
-
----
-
-### 3.3 Checkout — guest order
-
-Add an item to cart, navigate to `$FRONTEND/checkout`.
-
-- [ ] Page loads (not redirected — cart has items)
-- [ ] Order summary shows correct items and subtotal
-- [ ] Fill in the form:
-  - Full Name: `Test User`
-  - Email: `test@example.com`
-  - Street: `123 MG Road`
-  - City: `Bengaluru`
-  - State: `Karnataka`
-  - Postal Code: `560001`
-  - Country: `India` (pre-filled)
-- [ ] Click "Place Order"
+- [ ] Navigate to `/checkout` with items in cart
+- [ ] Fill in shipping details and click "Place Order"
 - [ ] Redirected to `/order-confirmation/<id>`
-- [ ] Order confirmation page shows order ID, items, total, and shipping address
-- [ ] Cart is cleared (navbar badge gone)
-
-**Verify server-side total** — the total shown on the confirmation page must match the DB price (₹349 for 10ml), not whatever was in the cart. This confirms the backend is computing the total, not the frontend.
-
----
-
-### 3.4 Verify order in database (via admin API)
-
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "$BACKEND/api/admin/orders" | python3 -m json.tool
-```
-
-- [ ] The test order appears with status `PENDING`
-- [ ] `totalAmount` matches the DB price (not client-submitted)
-- [ ] `unit_price_snap`, `product_name_snap`, `variant_label_snap` are populated
-
----
-
-### 3.5 Order status transition (admin)
-
-```bash
-# Replace <ORDER_ID> with the ID from the previous step
-ORDER_ID=1
-
-curl -s -X PUT \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status":"PROCESSING"}' \
-  "$BACKEND/api/admin/orders/$ORDER_ID/status" | python3 -m json.tool
-```
-
-**Expected** — order returned with `"status": "PROCESSING"`.
-
-```bash
-# Verify invalid transition is rejected
-curl -s -X PUT \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"status":"FULFILLED"}' \
-  "$BACKEND/api/admin/orders/$ORDER_ID/status"
-```
-
-**Expected** — `{ "status": 400, "message": "..." }` (PROCESSING → FULFILLED is invalid).
+- [ ] Order total matches DB price (₹349), not client-submitted price
+- [ ] Cart is cleared after order
 
 ---
 
@@ -317,36 +239,36 @@ curl -s -X PUT \
 
 Navigate to `$FRONTEND/admin/login`.
 
-- [ ] Login form renders
-- [ ] Login with `admin@scentedmemories.in` / `Admin@123`
-- [ ] Redirected to `$FRONTEND/admin` dashboard
-- [ ] Sidebar shows Dashboard, Products, Orders
-- [ ] Stats cards load (Total Products: 10, Total Orders: ≥ 1)
+- [ ] Login with `admin@scentedmemories.in` / `sushant123`
+- [ ] Redirected to `/admin` dashboard (not stuck on spinner)
+- [ ] Dashboard shows: Total Products, Total Orders, Pending Orders stats
+- [ ] Recent Orders table shows all orders (all statuses, not just pending)
+- [ ] Refresh button reloads dashboard data
 
-**If redirected to `/` instead of `/admin`** — the JWT `role` claim is not `ADMIN`. Verify the seed user has `role = 'ADMIN'` in the DB.
-
----
-
-### 4.2 Admin products page
+### 4.2 Admin products
 
 Navigate to `$FRONTEND/admin/products`.
 
-- [ ] Product table loads with 10 rows
-- [ ] Search filters the list
-- [ ] "Deactivate" button soft-deletes a product (removes from public listing)
-- [ ] Deactivated product no longer appears at `$FRONTEND/products`
+- [ ] All 10 products listed with images
+- [ ] Search for "Lavender" returns only Lavender Essential Oil
+- [ ] "Edit" link opens the edit form pre-filled with product data
+- [ ] Edit form shows: name, description, category, image URLs with preview, variants, tags
+- [ ] Changing a price and clicking "Save & Publish" updates the storefront immediately
+- [ ] "Add Product" opens a blank form
+- [ ] Creating a new product makes it appear in the public storefront
+- [ ] "Deactivate" removes the product from the public listing
+- [ ] On mobile: table scrolls horizontally
 
----
-
-### 4.3 Admin orders page
+### 4.3 Admin orders
 
 Navigate to `$FRONTEND/admin/orders`.
 
-- [ ] Orders table loads
-- [ ] Status filter buttons work (PENDING, PROCESSING, etc.)
+- [ ] All orders listed with status badges
+- [ ] Status filter buttons (All, PENDING, PROCESSING, etc.) work
 - [ ] Clicking a row expands order detail (items + shipping address)
 - [ ] Status transition buttons appear for non-terminal orders
-- [ ] Clicking a transition button updates the status inline
+- [ ] Clicking a transition button updates status inline
+- [ ] On mobile: table scrolls horizontally
 
 ---
 
@@ -356,89 +278,53 @@ Navigate to `$FRONTEND/admin/orders`.
 
 | Symptom | Where to look |
 |---|---|
-| Backend not responding | Render dashboard → Logs tab → look for startup errors |
+| Backend not responding | Render → Logs tab → startup errors |
 | Flyway migration failed | Render logs → search `FlywayException` or `Migration V` |
-| DB connection refused | Render logs → search `HikariPool` or `Connection refused` |
+| DB connection refused | Render logs → search `HikariPool` or `PSQLException` |
 | JWT errors | Render logs → search `JwtException` or `SignatureException` |
-| CORS errors in browser | Browser DevTools → Network → failed preflight OPTIONS request |
-| Frontend build failed | Vercel dashboard → Deployments → build log |
-| Blank page on Vercel | Browser console → look for `NEXT_PUBLIC_API_URL` error |
+| CORS errors in browser | Browser DevTools → Network → failed OPTIONS preflight |
+| Frontend build failed | Vercel → Deployments → build log |
+| Admin stuck on spinner | JWT hydration race — ensure latest frontend is deployed |
+| Images not showing | Check V4 migration ran; check Render redeployed after image push |
+| Search returning wrong results | Check V4 migration ran; admin uses name-only search |
 
 ---
 
 ### Render logs — useful search terms
 
 ```
-# DB connection issues
-HikariPool | Connection refused | SSL | neon
-
-# Flyway
-Flyway | Migration | V1__ | V2__ | V3__
-
-# JWT
-JwtException | SignatureException | ExpiredJwt
-
-# App startup
-Started ScentedMemoriesApplication | Tomcat started
-
-# Request errors
-ERROR | WARN | Exception
+HikariPool | PSQLException | Connection refused   # DB issues
+Flyway | Migration | V1__ | V2__ | V3__ | V4__ | V5__  # Migration issues
+JwtException | SignatureException                 # JWT issues
+Started ScentedMemoriesApplication               # Successful startup
+ERROR | WARN | Exception                          # General errors
 ```
 
 ---
 
 ### Quick CORS diagnosis
 
-Open browser DevTools → Console. A CORS error looks like:
-
 ```
 Access to fetch at 'https://...onrender.com/api/...' from origin
-'https://...vercel.app' has been blocked by CORS policy:
-No 'Access-Control-Allow-Origin' header is present
+'https://...vercel.app' has been blocked by CORS policy
 ```
 
-**Checklist:**
-1. Is `FRONTEND_URL` set on Render? (Render dashboard → Environment)
-2. Does it exactly match the Vercel URL? (no trailing slash, `https://` not `http://`)
+1. Is `FRONTEND_URL` set on Render?
+2. Does it exactly match the Vercel URL? (no trailing slash, `https://`)
 3. Was the backend redeployed after setting `FRONTEND_URL`?
-4. Run the Phase 1.7 `curl` test to confirm the header is present.
+4. Run the Phase 1.8 `curl` test.
 
 ---
 
-### Quick DB diagnosis
+### Cold start (expected, not a bug)
 
-```bash
-# Test the Neon connection directly (requires psql)
-psql "$NEON_CONNECTION_STRING" -c "SELECT COUNT(*) FROM products;"
-
-# Expected: 10
-```
-
-If the count is 0 or the command fails:
-- Verify `DATABASE_URL` on Render uses the **pooler** endpoint (`ep-xxx-pooler.region...`)
-- Verify the URL includes `?sslmode=require&channel_binding=require`
-- Check Neon dashboard → Branches → confirm the database is active (not suspended)
+Render free tier suspends after 15 minutes of inactivity. Cold start takes 30–50 seconds. The frontend retries automatically for ~35 seconds. If the service doesn't respond after 60 seconds, check Render logs for a startup error.
 
 ---
 
-### Cold start behaviour (expected, not a bug)
+### Post-launch security
 
-Render free tier suspends the service after 15 minutes of inactivity. The first request after suspension triggers a cold start that takes **30–50 seconds**. During this time:
-
-- The frontend shows a loading state
-- The API client retries automatically (up to ~35 s total: 2 s + 4 s + 8 s + 16 s)
-- Render's health check has a grace period and will not mark the deploy as failed
-
-This is normal. If the service does not respond after 60 s, check Render logs for a startup error.
-
----
-
-### Post-launch security hardening
-
-Once both services are confirmed working:
-
-- [ ] Set `FRONTEND_URL` on Render to the exact Vercel URL (remove the `*` default)
-- [ ] Change the admin password — the seed password `Admin@123` is public
-- [ ] Rotate `JWT_SECRET` if it was ever logged or shared
-- [ ] Verify `spring.jpa.show-sql=false` in production (already set)
-- [ ] Verify Swagger UI is acceptable to expose (`/swagger-ui/**` is public)
+- [ ] `FRONTEND_URL` on Render set to exact Vercel URL (not `*`)
+- [ ] `JWT_SECRET` is at least 32 random characters
+- [ ] `spring.jpa.show-sql=false` in production (already set)
+- [ ] Admin password changed from default if needed

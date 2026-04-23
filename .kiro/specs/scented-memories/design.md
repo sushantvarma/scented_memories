@@ -6,9 +6,9 @@ This document describes the technical design for a full-stack e-commerce applica
 
 **Tech Stack:**
 - Frontend: Next.js 14 (App Router), Tailwind CSS, Zustand
-- Backend: Spring Boot 3.x (Java 21)
-- Database: PostgreSQL on Neon
-- Hosting: Vercel (frontend), Render (backend)
+- Backend: Spring Boot 3.2 (Java 21), deployed via Docker on Render
+- Database: PostgreSQL on Neon (serverless, pooled via PgBouncer)
+- Hosting: Vercel (frontend), Render (backend, Docker free tier)
 
 The MVP excludes payment processing. Orders are placed and recorded without payment. The cart is entirely client-side (Zustand, no server persistence).
 
@@ -56,40 +56,43 @@ The Render free tier spins down after 15 minutes of inactivity. The frontend dis
 
 ```mermaid
 graph TD
-    Layout["RootLayout (nav, cart icon, footer)"]
-    HomePage["HomePage (featured products, category links)"]
-    ProductListPage["ProductListPage (SSR, filter sidebar, product grid)"]
-    ProductDetailPage["ProductDetailPage (SSR, variant selector, add-to-cart)"]
-    CartDrawer["CartDrawer (line items, subtotal, checkout CTA)"]
+    Layout["RootLayout (logo, nav, cart icon, footer)"]
+    HomePage["HomePage (featured products, category links) — SSR, force-dynamic"]
+    ProductListPage["ProductListPage (SSR, force-dynamic, filter sidebar, product grid)"]
+    ProductDetailPage["ProductDetailPage (SSR, force-dynamic, variant selector, add-to-cart)"]
+    CartPage["CartPage (line items, subtotal, checkout CTA)"]
     CheckoutPage["CheckoutPage (shipping form, order summary)"]
-    OrderConfirmPage["OrderConfirmationPage (order ID, items)"]
-    AuthPages["AuthPages (LoginPage, SignupPage)"]
-    AdminLayout["AdminLayout (sidebar nav, auth guard)"]
-    AdminProductList["AdminProductListPage"]
-    AdminProductForm["AdminProductForm (add/edit)"]
-    AdminOrderList["AdminOrderListPage"]
-    AdminOrderDetail["AdminOrderDetailPage"]
+    OrderConfirmPage["OrderConfirmationPage (order ID, items) — client component"]
+    AuthPages["AuthPages (LoginPage, RegisterPage)"]
+    AdminLayout["AdminLayout (sidebar nav, auth guard, mobile hamburger)"]
+    AdminDashboard["AdminDashboard (stats, recent orders, refresh)"]
+    AdminProductList["AdminProductListPage (name-only search)"]
+    AdminProductForm["ProductForm component (add/edit, image preview, variants, tags)"]
+    AdminOrderList["AdminOrderListPage (status filter, expandable rows, inline transitions)"]
 
     Layout --> HomePage
     Layout --> ProductListPage
     Layout --> ProductDetailPage
-    Layout --> CartDrawer
+    Layout --> CartPage
     Layout --> CheckoutPage
     Layout --> OrderConfirmPage
     Layout --> AuthPages
+    AdminLayout --> AdminDashboard
     AdminLayout --> AdminProductList
     AdminLayout --> AdminProductForm
     AdminLayout --> AdminOrderList
-    AdminLayout --> AdminOrderDetail
 ```
 
 **Key component responsibilities:**
 
-- `ProductListPage`: SSR page that fetches products with active filters. Filter state lives in URL search params so it is shareable and SSR-compatible.
-- `ProductDetailPage`: SSR page. Variant selection is client-side state. "Add to Cart" dispatches to Zustand store.
-- `CartDrawer`: Reads from Zustand cart store. Renders line items, subtotal, and link to checkout.
-- `CheckoutPage`: Client-side form. On submit, calls `POST /api/orders`. On success, redirects to confirmation.
-- `AdminLayout`: Wraps all `/admin/*` routes. Checks JWT role on mount; redirects non-admins.
+- `ProductListPage`: SSR page (`force-dynamic`) that fetches products with active filters. Filter state lives in URL search params. On mobile, the filter sidebar collapses into a toggle button with an active filter count badge.
+- `ProductDetailPage`: SSR page (`force-dynamic`). Variant selection is client-side state. "Add to Cart" dispatches to Zustand store.
+- `CartPage`: Client component. Reads from Zustand cart store. Renders line items, subtotal, and link to checkout.
+- `CheckoutPage`: Client component. On submit, calls `POST /api/orders`. On success, redirects to confirmation.
+- `OrderConfirmationPage`: Client component (fetches on mount using JWT from localStorage — cannot be SSR because JWT is not available server-side).
+- `AdminLayout`: Wraps all `/admin/*` routes. Uses a `hydrated` flag to wait for `initFromStorage()` before making auth redirect decisions — prevents race condition where Zustand hasn't read localStorage yet.
+- `AdminDashboard`: Shows recent orders across all statuses (not just pending). Has a Refresh button and "Last updated" timestamp.
+- `ProductForm`: Shared component for both create and edit. Supports image URL entry with live preview, variant rows (label/price/stock), and tag selection by dimension.
 
 ### Zustand Cart Store
 
@@ -130,12 +133,16 @@ Controller (REST) → Service (business logic) → Repository (Spring Data JPA) 
 ### API Client (Frontend)
 
 A thin `apiClient` module wraps `fetch` with:
-- Base URL from `NEXT_PUBLIC_API_URL` env var.
-- Automatic `Authorization: Bearer <token>` header injection from localStorage/cookie.
-- Retry logic with exponential backoff for 503 responses (cold start).
-- Standardized error shape: `{ message: string, errors?: Record<string, string> }`.
+- Base URL from `NEXT_PUBLIC_API_URL` env var. Throws at build time if missing in production.
+- Automatic `Authorization: Bearer <token>` header injection from localStorage.
+- `cache: 'no-store'` on all fetch calls — prevents Next.js from caching API responses and serving stale data.
+- Retry logic with exponential backoff for 503 responses and network errors (cold start).
+- `safeJson()` helper — checks `Content-Type` before parsing error bodies, preventing secondary parse errors when Render returns HTML error pages during cold start.
+- Standardized error shape: `{ status, message, errors?: Record<string, string> }`.
 
----
+### Admin API
+
+The admin uses a separate `adminProductsApi` that calls `/api/admin/products` instead of the public `/api/products`. Key difference: the admin endpoint uses `nameOnly=true` in the product filter, so searching "lavender" matches only products whose **name** contains "lavender" — not products whose description mentions it.
 
 ## Data Models
 
@@ -372,10 +379,16 @@ Response `200`:
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
+| GET | `/api/admin/products` | ADMIN | List all products — name-only search |
+| GET | `/api/admin/products/{id}` | ADMIN | Get full product detail for edit form |
 | POST | `/api/admin/products` | ADMIN | Create product |
 | PUT | `/api/admin/products/{id}` | ADMIN | Update product |
 | DELETE | `/api/admin/products/{id}` | ADMIN | Soft-delete product |
 | PUT | `/api/admin/products/{productId}/variants/{variantId}/inventory` | ADMIN | Update stock |
+
+**GET /api/admin/products** query params:
+- `search` — matches product **name only** (not description). Prevents "lavender" from matching Eucalyptus because its description mentions lavender.
+- `page`, `size`
 
 **POST /api/admin/products** request:
 ```json
@@ -464,6 +477,34 @@ JWT is stored in `localStorage` for simplicity in MVP. An `httpOnly` cookie appr
 ### 7. Product Filtering Query Strategy
 
 The backend uses a Spring Data JPA `Specification` (Criteria API) to dynamically compose the product filter query. This avoids N+1 issues and keeps the query logic in one place. Tag filtering uses an `EXISTS` subquery against `product_tags` for each tag ID (AND logic).
+
+The `ProductFilterParams` record includes a `nameOnly` flag:
+- `nameOnly=false` (default, public API): search matches name OR description — customers can find products by scent notes mentioned in descriptions.
+- `nameOnly=true` (admin API): search matches name only — admins look up products by name, not by description content.
+
+### 8. Docker Runtime on Render
+
+Render Blueprint does not support `runtime: java`. The backend is deployed as a Docker container using a multi-stage build:
+- Stage 1 (`eclipse-temurin:21-jdk-alpine`): Maven build, produces fat JAR
+- Stage 2 (`eclipse-temurin:21-jre-alpine`): Runtime image, runs as non-root `spring` user
+
+The `ENTRYPOINT` uses shell form (not JSON array) so `$PORT` is expanded at runtime from Render's injected environment variable.
+
+### 9. Database Credentials Split from URL
+
+The PostgreSQL JDBC driver rejects URLs with credentials embedded in the standard `user:pass@host` format when the password contains certain characters. Credentials are passed as separate Spring properties (`DB_USERNAME`, `DB_PASSWORD`) rather than embedded in `DATABASE_URL`.
+
+### 10. Product Images in Next.js Public Folder
+
+Product images are stored in `frontend/public/` and served by Vercel at root paths (e.g. `/lavender-essential-oil.jpeg`). Image URLs in the database are relative paths. This avoids external CDN dependency for MVP. Adding a new product image requires: drop file in `public/`, commit and push, then set the URL in the admin panel.
+
+### 11. N+1 Prevention for Product Listing Images
+
+The product listing query (`findAll(spec, pageable)`) uses lazy loading. With `open-in-view=false`, the Hibernate session closes before the mapper runs, so `p.getImages()` returns empty. Fix: a single batch query (`findPrimaryImageUrlsByProductIds`) fetches all `position=0` image URLs for the current page in one SQL call, then passes them into the mapper.
+
+### 12. Admin Auth Hydration Race Condition
+
+The admin layout checks `user` and `isAdmin` from Zustand. On first render these are `null` because `initFromStorage()` hasn't run yet. Without a guard, the layout immediately redirects to `/admin/login`. Fix: a `hydrated` flag is set after `initFromStorage()` completes. The auth redirect effect waits for `hydrated=true` before acting.
 
 ---
 
