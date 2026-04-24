@@ -109,7 +109,7 @@ export default function FeedbackForm() {
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
               className={`input-field ${errors.name ? "input-error" : ""}`}
-              placeholder="Priya Sharma"
+              placeholder="Your name"
             />
             {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
           </div>
