@@ -2,6 +2,8 @@ import Link from "next/link";
 import { productsApi } from "@/lib/api/products";
 import type { Category, ProductSummary } from "@/types";
 import ProductCard from "@/components/ProductCard";
+import TestimonialsSection from "@/components/TestimonialsSection";
+import FeedbackForm from "@/components/FeedbackForm";
 
 // Force dynamic rendering — this page fetches live data from the backend.
 // Without this, Next.js tries to statically prerender at build time, which
@@ -106,6 +108,12 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Testimonials — auto-advancing carousel */}
+      <TestimonialsSection />
+
+      {/* Feedback form */}
+      <FeedbackForm />
     </div>
   );
 }
