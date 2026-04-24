@@ -160,6 +160,23 @@ export interface CreateProductRequest {
   variants: VariantRequest[];
 }
 
+// ── Feedback types ────────────────────────────────────────────────────────────
+
+export interface FeedbackRequest {
+  name: string;
+  email: string;
+  message: string;
+  rating: number;
+}
+
+export interface FeedbackResponse {
+  id: number;
+  name: string;
+  message: string;
+  rating: number;
+  createdAt: string;
+}
+
 // ── API error shape ───────────────────────────────────────────────────────────
 
 export interface ApiError {

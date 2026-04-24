@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { feedbackApi } from "@/lib/api/feedback";
+import { ApiClientError } from "@/lib/apiClient";
 
 export default function FeedbackForm() {
   const [form, setForm] = useState({ name: "", email: "", message: "", rating: 5 });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState<string | null>(null);
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -17,20 +21,31 @@ export default function FeedbackForm() {
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
 
-    // MVP: no backend storage. Show thank-you state.
-    // Post-MVP: send to backend API or email service.
-    console.log("Feedback submitted:", form);
-    setSubmitted(true);
+    setSubmitting(true);
+    setServerError(null);
 
-    // Reset after 5 seconds
-    setTimeout(() => {
-      setSubmitted(false);
-      setForm({ name: "", email: "", message: "", rating: 5 });
-    }, 5000);
+    try {
+      await feedbackApi.submit({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        message: form.message.trim(),
+        rating: form.rating,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        if (err.apiError.errors) setErrors(err.apiError.errors);
+        else setServerError(err.apiError.message);
+      } else {
+        setServerError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (submitted) {
@@ -47,8 +62,8 @@ export default function FeedbackForm() {
             Your voice matters
           </h2>
           <p className="text-sm text-brown leading-relaxed max-w-md mx-auto">
-            We've received your feedback and truly appreciate you taking the time to share your experience with us.
-            Your words help us grow and serve you better.
+            We've received your feedback and truly appreciate you taking the time to share
+            your experience with us. Your words help us grow and serve you better.
           </p>
         </div>
       </section>
@@ -144,17 +159,22 @@ export default function FeedbackForm() {
               placeholder="Share your story — which product did you love? How did it make you feel? What moment or memory does it bring back?"
             />
             {errors.message && <p className="text-xs text-red-500 mt-1">{errors.message}</p>}
-            <p className="text-xs text-taupe mt-1.5">
-              {form.message.length} / 500 characters
-            </p>
+            <p className="text-xs text-taupe mt-1.5">{form.message.length} / 500 characters</p>
           </div>
+
+          {serverError && (
+            <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 px-4 py-3">
+              {serverError}
+            </p>
+          )}
 
           {/* Submit */}
           <button
             type="submit"
-            className="w-full py-4 bg-espresso text-cream text-sm tracking-widest uppercase font-medium hover:bg-brown transition-colors duration-300"
+            disabled={submitting}
+            className="w-full py-4 bg-espresso text-cream text-sm tracking-widest uppercase font-medium hover:bg-brown transition-colors duration-300 disabled:opacity-50"
           >
-            Share Your Experience
+            {submitting ? "Submitting…" : "Share Your Experience"}
           </button>
 
           <p className="text-xs text-taupe text-center leading-relaxed">

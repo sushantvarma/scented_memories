@@ -1,21 +1,36 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { feedbackApi } from "@/lib/api/feedback";
+import type { FeedbackResponse } from "@/types";
 
 interface Testimonial {
   id: number;
   name: string;
-  location: string;
+  location?: string;
   rating: number;
   text: string;
-  product: string;
+  product?: string;
   initial: string;
   color: string;
 }
 
-const TESTIMONIALS: Testimonial[] = [
+// Pastel avatar colours — cycled by index
+const AVATAR_COLORS = [
+  "bg-[#D4C5E2]",
+  "bg-[#C5D4C2]",
+  "bg-[#E2D4C5]",
+  "bg-[#C5D0E2]",
+  "bg-[#E2C5C5]",
+  "bg-[#C5E2D4]",
+  "bg-[#E2E2C5]",
+  "bg-[#D4E2C5]",
+];
+
+// Seed testimonials shown when no live feedback exists yet
+const SEED_TESTIMONIALS: Testimonial[] = [
   {
-    id: 1,
+    id: -1,
     name: "Priya Sharma",
     location: "Mumbai",
     rating: 5,
@@ -25,7 +40,7 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#D4C5E2]",
   },
   {
-    id: 2,
+    id: -2,
     name: "Arjun Mehta",
     location: "Bengaluru",
     rating: 5,
@@ -35,7 +50,7 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#C5D4C2]",
   },
   {
-    id: 3,
+    id: -3,
     name: "Kavitha Nair",
     location: "Chennai",
     rating: 5,
@@ -45,7 +60,7 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#E2D4C5]",
   },
   {
-    id: 4,
+    id: -4,
     name: "Rohan Desai",
     location: "Pune",
     rating: 5,
@@ -55,7 +70,7 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#C5D0E2]",
   },
   {
-    id: 5,
+    id: -5,
     name: "Sneha Iyer",
     location: "Hyderabad",
     rating: 5,
@@ -65,7 +80,7 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#E2C5C5]",
   },
   {
-    id: 6,
+    id: -6,
     name: "Vikram Pillai",
     location: "Kochi",
     rating: 5,
@@ -75,6 +90,17 @@ const TESTIMONIALS: Testimonial[] = [
     color: "bg-[#C5E2D4]",
   },
 ];
+
+function toTestimonial(f: FeedbackResponse, index: number): Testimonial {
+  return {
+    id: f.id,
+    name: f.name,
+    rating: f.rating,
+    text: f.message,
+    initial: f.name.charAt(0).toUpperCase(),
+    color: AVATAR_COLORS[index % AVATAR_COLORS.length],
+  };
+}
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -94,9 +120,24 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export default function TestimonialsSection() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>(SEED_TESTIMONIALS);
   const [active, setActive] = useState(0);
   const [animating, setAnimating] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch live feedback on mount — prepend to seed testimonials
+  useEffect(() => {
+    feedbackApi.list().then((items) => {
+      if (items.length > 0) {
+        const live = items.map((f, i) => toTestimonial(f, i));
+        // Live feedback first, then seed testimonials
+        setTestimonials([...live, ...SEED_TESTIMONIALS]);
+        setActive(0);
+      }
+    }).catch(() => {
+      // Silently fall back to seed testimonials if API is unavailable
+    });
+  }, []);
 
   function goTo(index: number) {
     if (animating || index === active) return;
@@ -108,31 +149,31 @@ export default function TestimonialsSection() {
   }
 
   function next() {
-    goTo((active + 1) % TESTIMONIALS.length);
+    setActive((a) => (a + 1) % testimonials.length);
   }
 
   function prev() {
-    goTo((active - 1 + TESTIMONIALS.length) % TESTIMONIALS.length);
+    setActive((a) => (a - 1 + testimonials.length) % testimonials.length);
   }
 
   // Auto-advance every 6 seconds
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setActive((a) => (a + 1) % TESTIMONIALS.length);
+      setActive((a) => (a + 1) % testimonials.length);
     }, 6000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+  }, [testimonials.length]);
 
-  // Reset timer on manual navigation
   function handleNav(fn: () => void) {
     if (intervalRef.current) clearInterval(intervalRef.current);
     fn();
     intervalRef.current = setInterval(() => {
-      setActive((a) => (a + 1) % TESTIMONIALS.length);
+      setActive((a) => (a + 1) % testimonials.length);
     }, 6000);
   }
 
-  const t = TESTIMONIALS[active];
+  const t = testimonials[active];
+  if (!t) return null;
 
   return (
     <section className="bg-espresso text-cream py-24 overflow-hidden">
@@ -147,11 +188,9 @@ export default function TestimonialsSection() {
           <div className="w-12 h-px bg-gold mx-auto mt-4" />
         </div>
 
-        {/* Main testimonial card */}
+        {/* Main testimonial */}
         <div className="max-w-3xl mx-auto">
-          <div
-            className={`transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}
-          >
+          <div className={`transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
             {/* Quote mark */}
             <div className="text-center mb-8">
               <span className="font-serif text-7xl text-gold/30 leading-none select-none">"</span>
@@ -162,12 +201,14 @@ export default function TestimonialsSection() {
               {t.text}
             </blockquote>
 
-            {/* Product tag */}
-            <div className="flex justify-center mb-8">
-              <span className="text-[10px] tracking-[0.25em] uppercase text-gold border border-gold/30 px-4 py-1.5">
-                {t.product}
-              </span>
-            </div>
+            {/* Product tag — only shown for seed testimonials */}
+            {t.product && (
+              <div className="flex justify-center mb-8">
+                <span className="text-[10px] tracking-[0.25em] uppercase text-gold border border-gold/30 px-4 py-1.5">
+                  {t.product}
+                </span>
+              </div>
+            )}
 
             {/* Author */}
             <div className="flex flex-col items-center gap-3">
@@ -176,7 +217,9 @@ export default function TestimonialsSection() {
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-cream tracking-wide">{t.name}</p>
-                <p className="text-xs text-cream/50 tracking-widest uppercase mt-0.5">{t.location}</p>
+                {t.location && (
+                  <p className="text-xs text-cream/50 tracking-widest uppercase mt-0.5">{t.location}</p>
+                )}
               </div>
               <StarRating rating={t.rating} />
             </div>
@@ -192,9 +235,9 @@ export default function TestimonialsSection() {
               ←
             </button>
 
-            {/* Dots */}
-            <div className="flex gap-2">
-              {TESTIMONIALS.map((_, i) => (
+            {/* Dots — show max 10 to avoid overflow */}
+            <div className="flex gap-2 flex-wrap justify-center max-w-xs">
+              {testimonials.slice(0, 10).map((_, i) => (
                 <button
                   key={i}
                   onClick={() => handleNav(() => goTo(i))}
@@ -218,9 +261,9 @@ export default function TestimonialsSection() {
           </div>
         </div>
 
-        {/* Bottom row — all reviewer avatars */}
+        {/* Avatar row — show max 10 */}
         <div className="flex justify-center gap-3 mt-14 flex-wrap">
-          {TESTIMONIALS.map((testimonial, i) => (
+          {testimonials.slice(0, 10).map((testimonial, i) => (
             <button
               key={testimonial.id}
               onClick={() => handleNav(() => goTo(i))}

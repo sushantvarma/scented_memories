@@ -77,6 +77,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories", "/api/tags").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/orders").permitAll()
+                // Feedback — public submit and read
+                .requestMatchers(HttpMethod.POST, "/api/feedback").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/feedback").permitAll()
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // Order lookup — authenticated or admin (guest order restriction enforced in service)
