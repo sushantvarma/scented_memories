@@ -31,6 +31,14 @@ export default async function HomePage() {
           <p className="text-xs tracking-[0.3em] uppercase text-gold mb-6">
             Home Fragrance &amp; Wellness
           </p>
+          {/* Logo */}
+          <div className="flex justify-center mb-8">
+            <img
+              src="/logo.jpeg"
+              alt="Scented Memories"
+              className="h-28 w-28 sm:h-32 sm:w-32 rounded-full object-cover border-2 border-gold/40 shadow-lg"
+            />
+          </div>
           <h1 className="font-serif text-4xl sm:text-5xl md:text-7xl font-light leading-tight mb-6">
             Scents that tell<br />
             <em>your story</em>
