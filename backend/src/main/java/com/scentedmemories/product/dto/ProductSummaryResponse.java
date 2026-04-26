@@ -11,5 +11,6 @@ public record ProductSummaryResponse(
         String primaryImageUrl,
         BigDecimal startingPrice,
         CategoryResponse category,
-        List<TagResponse> tags
+        List<TagResponse> tags,
+        Integer totalStock   // sum of stock across all active variants; null for public API
 ) {}

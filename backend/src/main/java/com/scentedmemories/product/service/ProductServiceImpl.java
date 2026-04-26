@@ -43,26 +43,51 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Page<ProductSummaryResponse> listProducts(ProductFilterParams filters, Pageable pageable) {
+        return listProductsInternal(filters, pageable, false);
+    }
+
+    @Override
+    public Page<ProductSummaryResponse> listProductsWithStock(ProductFilterParams filters, Pageable pageable) {
+        return listProductsInternal(filters, pageable, true);
+    }
+
+    private Page<ProductSummaryResponse> listProductsInternal(
+            ProductFilterParams filters, Pageable pageable, boolean includeStock) {
+
         Specification<Product> spec = ProductSpecification.from(filters);
         Page<Product> page = productRepository.findAll(spec, pageable);
 
-        // Fetch primary images for all products on this page in a single query.
-        // Avoids N+1: without this, p.getImages() triggers a lazy load per product
-        // which fails with OSIV disabled (open-in-view=false).
         List<Long> productIds = page.getContent().stream()
                 .map(Product::getId)
                 .collect(Collectors.toList());
 
+        // Batch-fetch primary images (avoids N+1 with OSIV disabled)
         Map<Long, String> primaryImageByProductId = productIds.isEmpty()
                 ? Map.of()
                 : productRepository.findPrimaryImageUrlsByProductIds(productIds).stream()
                         .collect(Collectors.toMap(
                                 row -> (Long) row[0],
                                 row -> (String) row[1],
-                                (a, b) -> a   // keep first if duplicate
+                                (a, b) -> a
                         ));
 
-        return page.map(p -> toSummaryResponse(p, primaryImageByProductId.get(p.getId())));
+        // Batch-fetch total stock per product (admin only)
+        Map<Long, Integer> stockByProductId = Map.of();
+        if (includeStock && !productIds.isEmpty()) {
+            stockByProductId = productRepository.findTotalStockByProductIds(productIds).stream()
+                    .collect(Collectors.toMap(
+                            row -> (Long) row[0],
+                            row -> ((Number) row[1]).intValue(),
+                            (a, b) -> a
+                    ));
+        }
+
+        final Map<Long, Integer> stockMap = stockByProductId;
+        return page.map(p -> toSummaryResponse(
+                p,
+                primaryImageByProductId.get(p.getId()),
+                includeStock ? stockMap.get(p.getId()) : null
+        ));
     }
 
     // ── Public: product detail ────────────────────────────────────────────────
@@ -260,9 +285,10 @@ public class ProductServiceImpl implements ProductService {
      * Summary response for the listing page.
      * primaryImageUrl is passed in from the batch-fetched map — never touches
      * the lazy images collection to avoid N+1 / session-closed errors.
+     * totalStock is null for the public API; populated for the admin listing.
      * startingPrice = lowest price among active variants (null if none).
      */
-    private ProductSummaryResponse toSummaryResponse(Product p, String primaryImageUrl) {
+    private ProductSummaryResponse toSummaryResponse(Product p, String primaryImageUrl, Integer totalStock) {
         BigDecimal startingPrice = p.getVariants().stream()
                 .filter(ProductVariant::isActive)
                 .map(ProductVariant::getPrice)
@@ -279,7 +305,7 @@ public class ProductServiceImpl implements ProductService {
 
         return new ProductSummaryResponse(
                 p.getId(), p.getSlug(), p.getName(),
-                primaryImageUrl, startingPrice, category, tags);
+                primaryImageUrl, startingPrice, category, tags, totalStock);
     }
 
     /**

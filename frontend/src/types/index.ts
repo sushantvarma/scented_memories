@@ -35,6 +35,7 @@ export interface ProductSummary {
   startingPrice: number | null;
   category: Category;
   tags: Tag[];
+  totalStock: number | null;  // populated by admin endpoint only
 }
 
 /** Returned for product detail page */

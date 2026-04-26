@@ -76,10 +76,10 @@ export default function AdminProductsPage() {
       {/* Table */}
       <div className="bg-white border border-sand">
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px]">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="border-b border-sand bg-cream/50">
-              {["Product", "Category", "Starting Price", "Status", "Actions"].map((h) => (
+              {["Product", "Category", "Starting Price", "Inventory", "Status", "Actions"].map((h) => (
                 <th key={h} className="px-6 py-3 text-left text-[10px] tracking-widest uppercase text-taupe font-medium whitespace-nowrap">
                   {h}
                 </th>
@@ -89,13 +89,13 @@ export default function AdminProductsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-sm text-taupe">
+                <td colSpan={6} className="px-6 py-12 text-center text-sm text-taupe">
                   Loading products…
                 </td>
               </tr>
             ) : !data?.content.length ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-sm text-taupe">
+                <td colSpan={6} className="px-6 py-12 text-center text-sm text-taupe">
                   No products found.
                 </td>
               </tr>
@@ -132,6 +132,23 @@ export default function AdminProductsPage() {
                     <span className="font-serif text-base text-espresso">
                       {p.startingPrice != null ? `₹${p.startingPrice}` : "—"}
                     </span>
+                  </td>
+
+                  {/* Inventory */}
+                  <td className="px-6 py-4">
+                    {p.totalStock == null ? (
+                      <span className="text-taupe text-sm">—</span>
+                    ) : p.totalStock === 0 ? (
+                      <span className="text-[10px] tracking-widest uppercase px-2 py-1 font-medium bg-red-100 text-red-600">
+                        Out of stock
+                      </span>
+                    ) : p.totalStock <= 10 ? (
+                      <span className="text-[10px] tracking-widest uppercase px-2 py-1 font-medium bg-amber-100 text-amber-700">
+                        Low — {p.totalStock} left
+                      </span>
+                    ) : (
+                      <span className="text-sm text-espresso font-medium">{p.totalStock} units</span>
+                    )}
                   </td>
 
                   {/* Status */}

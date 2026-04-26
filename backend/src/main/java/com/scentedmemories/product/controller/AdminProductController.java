@@ -42,7 +42,7 @@ public class AdminProductController {
                 null, null, null, null, search, true  // nameOnly = true
         );
         return ResponseEntity.ok(
-                productService.listProducts(filters, PageRequest.of(page, size,
+                productService.listProductsWithStock(filters, PageRequest.of(page, size,
                         Sort.by("name").ascending()))
         );
     }

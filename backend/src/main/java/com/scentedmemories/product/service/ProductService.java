@@ -12,6 +12,9 @@ public interface ProductService {
     /** Public: paginated, filtered product listing. */
     Page<ProductSummaryResponse> listProducts(ProductFilterParams filters, Pageable pageable);
 
+    /** Admin: paginated, filtered product listing with stock totals. */
+    Page<ProductSummaryResponse> listProductsWithStock(ProductFilterParams filters, Pageable pageable);
+
     /** Public: single product detail by slug. */
     ProductDetailResponse getProductBySlug(String slug);
 

@@ -49,6 +49,18 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Object[]> findPrimaryImageUrlsByProductIds(@Param("productIds") List<Long> productIds);
 
     /**
+     * Sum of stock across all active variants, grouped by product.
+     * Used by the admin product listing to show total inventory per product.
+     * Returns a list of [productId, totalStock] pairs.
+     */
+    @Query("""
+            SELECT v.product.id, SUM(v.stock) FROM ProductVariant v
+            WHERE v.product.id IN :productIds AND v.active = true
+            GROUP BY v.product.id
+            """)
+    List<Object[]> findTotalStockByProductIds(@Param("productIds") List<Long> productIds);
+
+    /**
      * Lightweight lookup — used internally when only the product entity is needed
      * without eagerly loading all collections.
      */
